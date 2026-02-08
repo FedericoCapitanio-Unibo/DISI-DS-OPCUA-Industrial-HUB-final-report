@@ -117,10 +117,707 @@ the industrial sector. Below are the main reasons why distribution is necessary.
   Industrial plants are designed to operate 24/7 most of the time, requiring
   constant monitoring systems with high availability.
   \item \emph{Scalability:}
+  The possible increase in the number of monitored machines or lines themselves and the possibility that more
+  users and applications will need access to the data.
+  \item \emph{Geographic Distribution:}
+  Various industrial companies operate on sites that can cover different geographically distributed areas,
+  with different plants in different national and international areas.
+  Potentially, through the evolution of the system, clients will be able to connect to the node
+  that is physically closest to them.
 
 \end{itemize}
 
+
 \section{Requirements Elicitation and Analysis}\label{requirements-elicitation-and-analysys}
+Questa sezione ha lo scopo di indicare i requisiti del sistema e la loro implementazione per
+spegare cosa il software deve effettivamente fare.
+L'aspetto principale è spiegare cosa il software fornito deve fare quando entra in funzione.
+
+
+\subsection{Glossary}\label{glossary}
+
+Prima di procedere con l'analisi dei requisiti, è necessario definire alcuni
+termini specifici del dominio:
+
+\begin{description}
+    \item[OPC UA - Open Platform Communications Unified Architecture] 
+    An open international standard for secure and reliable data exchange, essential in the world of
+    Industry 4.0 and industrial IoT. It was developed by the OPC Foundation and enables interoperability
+    between heterogeneous devices and systems (PLCs, HMIs, clouds) regardless of manufacturer or
+    operating system.
+    Its strengths are the ability to leverage the integrated security offered by the protocol
+    itself, platform independence, scalability, and the ability to perform data modeling,
+    meaning that more complex structures can be managed depending on the context and/or the
+    company implementing the protocol.
+
+    \item[OEE - Overall Equipment Effectivness]
+    Main KPI for measuring the production capacity of a manufacturing company. It is often used
+    in Lean Manufacturing to achieve operational excellence.
+
+    \item[Tag]
+    OPC UA node or, generally speaking, a variable that could be collected, exposed or saved.
+
+    \item[HUB Node] 
+    Node of the distributed system provided by this software that collects data from OPC UA servers,
+    stores it locally, and exposes it via REST API. It participates in the
+    distributed synchronization protocols described below.
+    
+    \item[Anti-Entropy] 
+    Synchronization protocol that guarantees eventual consistency
+    through periodic exchanges of state differences between nodes.
+    
+    \item[Gossip Protocol] 
+    Peer-to-peer communication protocol in which each node periodically propagates
+    information about its own health and that of other
+    observed nodes, enabling distributed failure detection.
+    
+    \item[Lamport Clock] 
+    Logical timestamp that establishes a causal order between events
+    in a distributed system without requiring physical clock synchronization.
+    
+    \item[Eventual Consistency] 
+    Consistency model in which, given sufficient time and the absence of new
+    writes, all nodes in the system will converge to the same state.
+
+    \item[Load Balancer] 
+    Component that distributes client requests among available HUB nodes,
+    implementing health checks to detect non-functioning nodes.
+
+    \item[HTTP - HyperText Transfer Protocol]
+    Fundamental protocol for exchanging data on the World Wide Web. Based on a client-server
+    model, it allows clients(browser as an example) to request and receive resources.
+
+    \item[TLS - Transport Layer Security]
+    Cryptographic protocol designed to secure communications over a computer network.
+    It is widely used in applications such as email, instant messaging
+    and Voice over IP (VoIP), but it's best known for securing Hypertext Transfer Protocol
+    Secure (HTTPS).
+    There are different versions, and the most recent one is currently 1.3. However, different
+    legacy versions are widely used and leave security issues all over the internet.
+    
+    \item[JWT (JSON Web Token)] 
+    Is an open standard (RFC 7519) that defines a compact, self-contained way
+    to securely transmit information between parties as a JSON object. It is commonly used
+    for authentication and authorization, allowing servers to verify user identity without
+    database lookups. These tokens are digitally signed for security, ensuring data integrity.
+    
+    \item[RBAC (Role-Based Access Control)] 
+    Security method that regulates access to system resources based on
+    defined roles rather than individual user identities.
+    Assigns specific permissions to roles (e.g., admin, user, manager), simplifying security management.
+    
+\end{description}
+
+\subsection{Functional Requirements}\label{functional-requirements}
+
+\begin{enumerate}
+    \item \textbf{[FR-01] OPC UA Server Connection}
+    
+    The system must connect to configured OPC UA servers and periodically read the values
+    of the defined variables (OPC UA nodes).
+    
+    \textit{Acceptance Criterion}: Each HUB node can connect to one or more
+    OPC UA servers, authenticate correctly, and read values at a configurable frequency
+    (default: every 5 seconds). The data read includes the OPC UA server timestamp
+    and status code.
+    
+    \item \textbf{[FR-02] Data Persistence}
+    
+    The system must store the data collected from the OPC UA servers locally
+    in a relational database on each HUB node.
+    
+    \textit{Acceptance Criterion}: The data are saved in a structured format
+    (lamport\_clock, tag, node\_id, value, timestamp, quality, source\_server, server\_name)
+    with support for temporal queries and the db itself persists even after the node is restarted.
+    
+    \item \textbf{[FR-03] REST API Data Exposure}
+    
+    The system must expose the collected data through authenticated REST APIs,
+    allowing clients to query current and historical values.
+    
+    \textit{Acceptance Criterion}: API for data retrieve:
+    \begin{itemize}
+        \item GET \texttt{/api/v1/tags} - list all the tags for all the OPC UA server
+        \item GET \texttt{/api/v1/servers/{server\_name}/tags} - list all the tags for a specific OPC UA server source
+        \item GET \texttt{/api/v1/servers/{server\_name}/tags/{tag}/latest} - retrieve last value for a specific tag that is exposed in one specific OPC UA server
+        \item GET \texttt{/api/v1/servers/{server\_name}/tags/{tag}/history} - retrieve value for a specific tag that is exposed in one specific OPC UA server into a given time range
+        \item GET \texttt{/api/v1/servers} - list all configured OPC UA servers 
+    \end{itemize}
+    Every HTTP request need valid JWT into the Authorization header.
+    
+    \item \textbf{[FR-04] Dynamic Server Addition}
+    
+    The system must allow the addition of new OPC UA servers without the need to restart the HUB node.
+    
+    \textit{Acceptance Criterion}: An admin user can invoke
+    HTTP POST request at \texttt{/api/v1/admin/opc-servers} path including new OPC UA server
+    configuration including a name for the source and the endpoint on which the data will be
+    retrieved. The system immediately starts collecting data from the
+    new server and propagates the configuration to the other HUB nodes via
+    anti-entropy. The maximum propagation time is 30 seconds.
+    
+    \item \textbf{[FR-06] Data Synchronization Between Nodes}
+    
+    The system must synchronize the data collected between the three (or more) HUB nodes to
+    ensure that each node has a consistent copy of the data.
+    
+    \textit{Acceptance Criterion}: The anti-entropy protocol periodically compares
+    the state between nodes every 10 seconds using Lamport clocks. Differences are resolved
+    using the Last-Write-Wins strategy. After 30 seconds without new writes, all nodes must converge
+    to the same state.
+    
+    \item \textbf{[FR-07] Failure Detection}
+    
+    The system must automatically detect when a HUB node becomes unreachable.
+    
+    \textit{Acceptance Criterion}: The gossip protocol implements heartbeat
+    every 5 seconds between nodes. A node is considered “suspected failed”
+    after 3 consecutive missed heartbeats (15 seconds). The information is
+    propagated to other nodes via gossip with a detection probability
+    of $>$95\% within 20 seconds.
+    
+    \item \textbf{[FR-08] Automatic Traffic Redirection}
+    
+    The system must automatically redirect client traffic from non-functioning nodes to operational nodes.
+    
+    \textit{Acceptance Criterion}: The nginx load balancer performs HTTP health checks
+    every 30 seconds on the /health endpoint of each HUB node. If a node
+    does not respond or returns a 500 status, it is automatically removed from the
+    routing pool. Recovery occurs automatically when the node
+    returns to operation.
+    
+    \item \textbf{[FR-09] User Authentication}
+    
+    The system must authenticate users via credentials and issue JWT tokens for API access.
+    
+    \textit{Acceptance Criterion}: The POST endpoint \texttt{/api/v1/auth/token} accepts username and
+    password, verifies the credentials, and returns a JWT valid for 24 hours. The token includes
+    the user's role (admin or user).
+    
+    \item \textbf{[FR-10] Role-Based Authorization}
+    
+    The system implements role-based access control.
+    
+    \textit{Acceptance Criterion}:
+    \begin{itemize}
+        \item Ruolo \texttt{user}: può solo leggere dati.
+        \item Ruolo \texttt{admin}: può leggere e modificare configurazione
+    \end{itemize}
+    Unauthorized requests return HTTP 403 Forbidden.
+
+\end{enumerate}
+
+\subsection{Non-Functional Requirements}\label{non-functional-requirements}
+
+\begin{enumerate}
+    \item \textbf{[NFR-01] Eventual Consistency}
+    
+    The system prioritizes availability and partition tolerance over strong consistency, implementing eventual consistency.
+    
+    \textit{Acceptance Criterion}: During network partitions or partial failures, nodes continue
+    to accept writes (server addition) and reads. Convergence to the same state is guaranteed
+    within 60 seconds of connectivity restoration. Different clients may observe temporarily different
+    snapshots.
+    
+    \item \textbf{[NFR-02] Response Time}
+    
+    REST APIs must respond with acceptable latency for industrial monitoring applications.
+    
+    \textit{Acceptance Criterion}:
+    The following tests have been performed in a LAN(Local Area Network). So, since the system
+    is created to work also in different networks, other tests would be performed to estimate
+    reponse time in the specific case.
+    The first two items of the following list have been tested under a load of 50 requests per
+    second distributed across the three nodes.
+    \begin{itemize}
+        \item Live data reading: P95 latency $<$ 100ms
+        \item Historical data reading: P95 latency $<$ 1s for 1000 record
+        \item Aggiunta server: $<$ 100ms (local processing + asynchronous propagation)
+    \end{itemize}
+    
+    \item \textbf{[NFR-03] Data Integrity}
+    
+    The collected data must be stored with guaranteed integrity,
+    preserving the original timestamps of the OPC UA server.
+    
+    \textit{Acceptance Criterion}: Data is never modified after initial entry. Each record
+    includes the timestamp of the source OPC UA server, allowing for correct temporal sorting even in the
+    presence of clock drift between HUB nodes.
+    
+    \item \textbf{[NFR-04] Scalability - Server OPC UA}
+    
+    The system must support a growing number of OPC UA servers without
+    significant performance degradation.
+    
+    \textit{Acceptance Criterion}: The system must manage a number of OPC UA servers as required by
+    the end user. Consider scaling out the HUB nodes, trying to
+    maintain a 1:10 ratio between HUB nodes and OPC UA servers, obviously always leaving a
+    minimum of 3 HUB nodes.
+    
+    % TODO va messo poi sotto nell'apposita sezione
+    \item \textbf{[NFR-08] Security - Data in Transit}
+    
+    All communications between the client and the system must be encrypted.
+    
+    \textit{Acceptance Criterion}: The nginx load balancer implements TLS 1.3 termination with
+    valid certificates, even if in this case they're provided as self-signed, since a CA authority
+    request could be submitted for receive a valid one that would be recognized and verifiable
+    all over the internet.
+    Unencrypted HTTP connections are redirected directly to HTTPS.
+    If the system is to be published on a public domain, tests like on
+    \emph{www.ssllabs.com/ssltest} site are recoomend to ensure a high level of security.
+        
+    \item \textbf{[NFR-09] Security - Authentication}
+    
+    The system must prevent unauthorized access to APIs.
+    
+    \textit{Acceptance Criterion}: Every request to the APIs (except /auth/login)
+    requires a valid JWT. Expired, malformed, or invalidly signed tokens are rejected with HTTP
+    401. The JWT secret is shared among all HUB nodes and it's auto-generated during 
+    application setup.
+    
+\end{enumerate}
+
+\subsection{Implementation Requirements}\label{implementation-requirements}
+
+\begin{enumerate}
+    \item \textbf{[IR-01] Programming Language: Python}
+    
+    The backend of the HUB nodes must be developed in Python 3.11+.
+    
+    \textit{Justification}: Python offers recent libraries for OPC UA
+    (asyncua), high-performance web frameworks with asynchronous support
+    (FastAPI), and a rich ecosystem for rapid development. The I/O-bound nature
+    of the system (network + database) benefits from Python's asynchronous event loop.
+
+    Website for details: https://python.org/
+    
+    \item \textbf{[IR-02] Web Framework: FastAPI}
+    
+    REST APIs must be implemented with FastAPI.
+    
+    \textit{Justification}: FastAPI provides high performance comparable
+    to Node.js thanks to Starlette and uvicorn, automatic data validation
+    with Pydantic, automatic OpenAPI documentation generation, and native support
+    for asynchronous operations essential for non-blocking I/O to
+    OPC UA servers and databases.
+
+    Website for details: https://fastapi.tiangolo.com/.
+
+    \item \textbf{[IR-03] ORM: SQLAlchemy}
+    
+    Access to the database must use SQLAlchemy as the ORM.
+    
+    \textit{Justification}: SQLAlchemy is the standard ORM in Python, providing
+    database abstraction (SQLite in development, PostgreSQL in
+    production possible), support for schema migrations via Alembic,
+    and type-safe queries that reduce runtime errors.
+
+    Website for details: https://www.sqlalchemy.org/
+    
+    \item \textbf{[IR-04] Database: SQLite}
+    
+    Each HUB node uses SQLite as its local database.
+    
+    \textit{Justification}: SQLite is embedded, does not require a separate server,
+    has a minimal footprint, and is sufficient for expected workloads
+    (write-intensive but not concurrent between different processes). Each node
+    operates on an independent database, replicated via anti-entropy.
+
+    Website for details: https://sqlite.org/
+
+    %  TODO aggiungere sezione su pydantic
+    \item \textbf{[IR-11] Data validation and serialization: Pydantic}
+
+    LData validation and serialization must be implemented using Pydantic.
+
+    \textit{Justification}: \emph{pydantic} provides automatic data validation using
+    Python type hints, ensuring data integrity at the API boundaries. It integrates
+    seamlessly with FastAPI for automatic validation of requests and responses, generates
+    JSON schemas for API documentation (see below: Swagger API), and prevents common errors
+    such as type mismatches or missing required fields.
+    Pydantic define clear models for:
+    \begin{itemize}
+        \item request/response API payload (es. server config, authentication credentials)
+        \item configuration file validation (startup parameter, JWT secret, ...)
+        \item database model with SQLAlchemy integration
+    \end{itemize}
+    This approach provides type safety at runtime, catching errors before they propagate through the system, and reduces the need for manual validation code.
+    For example, when adding a new OPC UA server via POST \texttt{/api/v1/admin/opc-servers},
+    Pydantic automatically validates that the endpoint URL is well-formed, that the required fields
+    are present, and that the data types are correct, returning clear error messages
+    to the client in case of failed validation.
+
+    Website for details: https://docs.pydantic.dev/latest/
+    
+    \item \textbf{[IR-05] Containerization: Docker}
+    
+    The system must be deployable via Docker and Docker Compose.
+    
+    \textit{Justification}: \emph{Docker} guarantees environment reproducibility, simplifies multi-node
+    deployment on a single machine for development/testing, isolates dependencies,
+    and make scale out easier. Docker Compose orchestrates the 3(or even more) simulated
+    HUB + nginx + OPC UA server(to simulate real servers) nodes with a single command.
+
+    Website for details: https://www.docker.com/
+    
+    \item \textbf{[IR-06] Load Balancer: nginx}
+    
+    Load balancing and TLS termination must be handled by nginx.
+    
+    \textit{Justification}: \emph{nginx} is extremely powerful for reverse
+    proxy, supports native health checks, simple configuration for
+    round-robin, and robust TLS management. Extensively tested in production
+    and with minimal footprint.
+
+    Website for details: https://nginx.org/
+    
+    \item \textbf{[IR-08] OPC UA Library: asyncua}
+    
+    The connection to OPC UA servers must use the asyncua library.
+    
+    \textit{Justification}: \emph{asyncua} is a pure Python implementation of OPC UA client with
+    native asynchronous support, compatible with FastAPI event loop, actively maintained,
+    and supports necessary OPC UA features (browsing, subscriptions, read multiple nodes).
+
+    Website for details: https://github.com/FreeOpcUa/opcua-asyncio
+    
+    \item \textbf{[IR-09] Authentication JWT: python-jose}
+    
+    Authentication must implement JSON Web Tokens by integrating it with Python.
+    
+    \textit{Justification}: \emph{python-jose} is a popular Python library for working with JWT, which
+    support various algorithms and allows the creation, decoding, and verification of tokens,
+    ideal for secure authentication.
+
+    Website for details: https://python-jose.readthedocs.io/en/latest/.
+    
+    \item \textbf{[IR-10] Development Environment: PowerShell Script or Bash Script}
+    
+    Setup and authentication scripts must be provided in PowerShell and Bash.
+    
+    \textit{Justification}: since the operating system on which the software will run is not
+    defined, two setup scripts are provided, one in PowerShell and one in Bash, allowing
+    the user to run the script that best suits their needs.
+    Within the script, TLS certificates are automatically generated, or possibly recreated if
+    they are detected but expired, and the user is prompted to enter the username and password
+    of the admin user, in addition to the option of creating additional users who will be
+    classified as normal users (see previous section - RBAC).
+    The information provided by the user will be entered into an environment variables file.
+
+\end{enumerate}
+
+
+
+\subsection{Relevant Distributed System Features}\label{ds-features}
+
+The following analysis explains which characteristics of distributed systems are
+critical to the success of the project and which are less relevant in the specific context
+of an industrial data collection system.
+
+\subsubsection{Fault Tolerance e Dependability}
+
+\paragraph{Relevance: HIGH} - Fault tolerance is the fundamental pillar of the system, given that industrial plants
+require continuous and constant monitoring.
+
+\begin{itemize}
+    \item \textbf{Availability}: The system must guarantee high availability since the final user, like the customer
+    that could buy it, would track all the machine status in order to calculate machine
+    performance and quality, introducing OEE calculation concept. What’s more,
+    most of the company the buy industrial automation machine, works 24/7 and
+    need continuos monitoring about machines’ state.
+    With three(at least) operational HUB nodes, the system tolerates the
+    failure of one or two nodes while continuing to serve requests without interruption.
+    As the number of HUB nodes increases, the fault tolerance capacity clearly grows.
+    An assessment must therefore be made to understand how many requests will be
+    made to the distributed system and how frequent they will be, so that the number
+    of nodes can be scaled to a sufficient number.
+
+    \item \textbf{Partion Tolerance}
+    The system must continue to work correctly even in the presence of network par-
+    titions between HUB nodes.
+    If the network has partitions and nodes are splitted into isolated groups, each group
+    continues to serve clients connected to it. When the partition resolves, the anti-entropy
+    protocol automatically reconciles divergent states.
+    
+    \item \textbf{Reliability}: Data loss is unacceptable in an industrial context,
+    where each sample represents the status of a machine at a specific moment in time.
+    Replication via anti-entropy ensures that the data collected by one node
+    is propagated to all other nodes, preventing data loss
+    even in the event of a sudden crash.
+    
+    \item \textbf{Recovery Time}: The system implements automatic recovery mechanisms:
+    \begin{itemize}
+        \item Gossip protocol detects failure within $\sim$15 seconds (3 heartbeat missed).
+        \item Load balancer remove not working nodes from pool in $\sim$30 seconds.
+        \item Anti-entropy resynchronizes restored nodes in $<$60 seconds.
+    \end{itemize}
+    
+    \item \textbf{Integrity}: Each piece of data includes the original OPC UA timestamp and
+    Lamport clock for causal ordering, ensuring that temporal integrity is preserved even with
+    clock drift between nodes.
+    
+\end{itemize}
+
+\subsubsection{High Availability}
+
+\paragraph{Relevance: HIGH} - High availability is not only desirable but necessary for industrial use cases:
+
+\begin{itemize}
+    \item \textbf{No Single Point of Failure}: Each component is redundant:
+    \begin{itemize}
+        \item 3 independent HUB nodes collect data in parallel.
+        \item Each node has a local database (no dependency on a central database).
+        \item Load balancer can be replicated (not implemented in this prototype
+        but architecturally possible).
+    \end{itemize}
+    
+    \item \textbf{Partition Tolerance}: During network partitions, each isolated group
+    continues to operate autonomously. When the partition resolves, anti-entropy automatically
+    reconciles divergent states.
+
+\end{itemize}
+
+\subsubsection{Transparency}
+
+\paragraph{Relevance: HIGH} - Transparency is essential for simplifying the use of the system:
+
+\begin{itemize}
+    \item \textbf{Location Transparency}: clients interact with a single endpoint
+    (the load balancer) without knowing which HUB node is actually serving the request.
+    This hides the physical distribution and allows horizontal scaling
+    by adding nodes without changing client configurations.
+    
+    \item \textbf{Replication Transparency}: clients are unaware that the data
+    is replicated across three nodes. They send a single GET request and receive a
+    response, regardless of which replica serves the request.
+    
+    \item \textbf{Failure Transparency (parziale)}: HUB node failures are
+    completely transparent to clients: requests continue to be served
+    by the surviving nodes. However, eventual consistency implies that different clients
+    may temporarily observe slightly different states during synchronization windows,
+    so failure transparency is not total.
+    
+    \item \textbf{Access Transparency}: REST APIs are identical regardless of the node
+    on which the request is forwarded,ensuring a uniform interface.
+
+\end{itemize}
+
+\subsubsection{Scalability}
+
+\paragraph{Relevance: HIGH} - Scalability is essential to adapt to the growth of the industrial plant:
+
+\begin{itemize}
+    \item \textbf{Horizontal Scalability - HUB nodes}: HUB nodes can be added
+    to the cluster to further distribute the load. The system is designed to be stateless at the
+    level of individual HTTP requests (authentication via stateless JWT), facilitating the
+    addition of new nodes.
+    
+    \item \textbf{Horizontal Scalability - OPC UA server}: New OPC UA servers can
+    be added dynamically via admini APIs without restarting. The configuration is automatically
+    propagated to all HUB nodes via anti-entropy.
+    
+    \item \textbf{Request Scalability}: The load balancer distributes requests
+    in round-robin fashion. By adding a fourth node, the theoretical throughput increases by 33\%.
+    
+    \item \textbf{Storage Scalability}: Each node stores all collected data locally.
+    For very large datasets, retention strategies can be implemented (e.g., keep the last 30
+    days locally, archive historical data on separate storage).
+
+\end{itemize}
+
+\subsubsection{Security e Trust}
+
+\paragraph{Relevance: HIGH} - Security is critical since the system exposes potentially sensitive data from production processes:
+
+\begin{itemize}
+    \item \textbf{Authentication}: JWT-based authentication ensures that only
+    authenticated users can access the APIs. Tokens expire (24 hours)
+    and include role information for authorization.
+    
+    \item \textbf{Authorization (RBAC)}: Role-based access control:
+    \begin{itemize}
+        \item Utenti \texttt{user}: data read-only permissions.
+        \item Utenti \texttt{admin}: can modify configurations by adding OPC UA server.
+    \end{itemize}
+    
+    \item \textbf{Data in Transit}: TLS 1.3 termination on nginx encrypts all
+    client-system communications. Unencrypted HTTP connections are rejected
+    or redirected.
+    
+    \item \textbf{Trust Model}: The system assumes that:
+    \begin{itemize}
+        \item HUB nodes are trusted (they operate in the same controlled environment).
+        \item OPC UA servers are trusted (part of the industrial infrastructure).
+        \item Clients are untrusted (require authentication/authorization).
+    \end{itemize}
+    
+    \item \textbf{Secret Management}: The JWT secret is automatically generated during
+    setup and shared between HUB nodes via configuration. In production, we recommend
+    using secret management tools (e.g., HashiCorp Vault).
+\end{itemize}
+
+\subsubsection{Resource Sharing e Coordination}
+
+\paragraph{Relevance: MEDIUM-HIGH} - Multiple components share resources and require coordination:
+
+\begin{itemize}
+    \item \textbf{Shared Resource: OPC UA Servers}: Multiple HUB nodes can
+    connect to the same OPC UA servers in read mode. There is no conflict because
+    the operations are read-only (the system does not send control commands to the
+    machines).
+    
+    \item \textbf{Coordination for Configuration}: When an administrator adds a new
+    OPC UA server, the configuration must be propagated to all nodes. Anti-entropy
+    with Lamport clocks ensures consistent ordering of configuration events.
+    
+    \item \textbf{No Strong Synchronization}: Unlike systems that require
+    strong consensus (e.g., Raft, Paxos), this system deliberately avoids synchronous
+    consensus protocols in favor of availability. Coordination is asynchronous and best-effort.
+    
+    \item \textbf{Conflict Resolution}: The Last-Write-Wins strategy based on Lamport clocks
+    resolves conflicts without voting or synchronous coordination.
+    The Last-Write-Wins strategy based on Lamport clocks resolves conflicts without voting or
+    synchronous coordination.
+
+  \end{itemize}
+
+\subsubsection{Openness, Interoperability, Heterogeneity}
+
+\paragraph{Relevance: HIGH} - Interoperability is essential since the system is a middleware that integrates different
+protocols:
+
+\begin{itemize}
+    \item \textbf{Protocollo OPC UA (Input)}: open industry standard for
+    communication with PLCs, SCADA, and DCS from any vendor. Ensures interoperability
+    with existing industrial ecosystems (Siemens, Schneider Electric, Rockwell, etc.).
+    
+    \item \textbf{REST API (Output)}: modern web standard for exposing data. It allows
+    integration with business intelligence applications, web dashboards, ERP systems,
+    mobile apps, etc.
+    
+    \item \textbf{Standardizzazione}: the use of standard protocols (OPC UA, HTTP/REST,
+    TLS, JWT) ensures that the system can be integrated into heterogeneous architectures
+    without vendor lock-in.
+    
+    \item \textbf{Heterogeneity of Components}: the system integrates:
+    \begin{itemize}
+        \item OPC UA server;
+        \item HUB Python nodes (FastAPI, SQLAlchemy);
+        \item Nginx oad balancer (C);
+        \item Client HTTP (qualsiasi linguaggio/piattaforma).
+    \end{itemize}
+    
+    \item \textbf{Openness}: Open architecture allows for future extensions:
+    \begin{itemize}
+        \item addition of alternative input protocols (MQTT, Modbus, Profinet);
+        \item addition of alternative output protocols (GraphQL, gRPC, WebSocket);
+        \item integration with analytics systems (InfluxDB, TimescaleDB).
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Evolvability e Maintainability}
+
+\paragraph{Relevance: HIGH} - The system is designed for long-term evolution:
+
+\begin{itemize}
+    \item \textbf{Containerization}: Docker ensures consistent deployment and
+    simplifies updates. Each component (HUB node, nginx, OPC UA simulator)
+    is containerized independently.
+    
+    \item \textbf{Rolling Updates}: Ability to update nodes one at a time
+    without total downtime, which is essential for 24/7 systems.
+    
+    \item \textbf{API Versioning}: The APIs include versioning in the path (\texttt{/api/v1/...})
+    allowing the introduction of incompatible versions while maintaining backward compatibility.
+    
+    \item \textbf{Configuration Management}: Configuration outsourced to
+    \texttt{.env} files and automatically generated by setup scripts. Configuration changes
+    do not require recompilation.
+    
+    \item \textbf{Monitoring e Debugging}: Endpoint \texttt{/health} for health checks,
+    structured logging, and the possibility of adding Prometheus/Grafana metrics
+    in the future.
+    
+    \item \textbf{Modular Architecture}: Well-separated components:
+    \begin{itemize}
+        \item OPC UA collectors (data collection)
+        \item API layer (data exposure)
+        \item Gossip agent (failure detection)
+        \item Anti-entropy agent (synchronization)
+    \end{itemize}
+    They allow isolated changes to individual modules even if they're integrated into the HUB nodes.
+    See the design part for more info.
+\end{itemize}
+
+\subsubsection{Performance, Concurrency, Communication Efficiency}
+
+\paragraph{Relevance: MEDIUM} - Performance is important but not as critical as availability:
+
+\begin{itemize}
+    \item \textbf{Acceptable Latency}: for industrial monitoring, latencies
+    P95 of 100-200ms are acceptable. The system is not real-time critical (it does not
+    control machinery, it only collects data).
+    
+    \item \textbf{Concurrency}: FastAPI with asynchronous event loop handles multiple
+    concurrent requests without blocking.
+    
+    \item \textbf{Bandwidth}: for data collection, it depends strictly on the number
+    of variables present on the OPC UA servers. As the number of variables increases,
+    the bandwidth used increases linearly.
+    As for user requests, it all depends on how many applications use
+    the system to retrieve data.
+    
+    \item \textbf{Network Efficiency}: anti-entropy exchanges only differences (delta),
+    not the entire dataset.
+    
+    \item \textbf{Tradeoff Awareness}: The system sacrifices strong consistency
+    (which would require synchronous coordination and greater latency) to achieve
+    greater throughput and availability.
+\end{itemize}
+
+\subsubsection{Economy e Costs}
+
+\paragraph{Relevance: MEDIUM} - Some economic considerations can influence architectural choices:
+
+\begin{itemize}
+    \item \textbf{Open Source Stack}: all technologies used are open source
+    (Python, FastAPI, SQLite, nginx, Docker), eliminating licensing costs.
+    
+    \item \textbf{Operational Costs}: containerized deployment reduces operational complexity.
+    Setup scripts automate configuration, reducing deployment and maintenance costs.
+    
+    \item \textbf{Scalability Costs}: obviously adding capacity for allowing application scale update
+    requires new nodes as hardware commodities, and the cost increase would depends on which
+    hardware will be selected and on how much the system has to grow.
+
+\end{itemize}
+
+\subsubsection{NOT relevant or Secondary Features} - For the sake of completeness, some characteristics of distributed systems are of lesser relevance
+to this project:
+
+\begin{itemize}
+    \item \textbf{Strong Consistency}: Deliberately NOT implemented due to the AP priority.
+    
+    \item \textbf{Consensus Protocols}: Protocols such as Raft or Paxos are not
+    necessary given the nature of the data (time-series append-only without conflicting
+    concurrent writes) and for development time constraints.
+    
+    \item \textbf{Byzantine Fault Tolerance}: Not necessary since all nodes
+    operate in a controlled environment and are trusted.
+    
+    \item \textbf{Real-Time Guarantees}: The system has no hard real-time requirements.
+    Latencies in the order of hundreds of milliseconds are acceptable.
+    
+    \item \textbf{Geo-Distribution}: In this prototype, nodes are co-located
+    (same LAN). In production, it could be extended to geo-distributed deployment as said at the
+    beginning of this report, but this is not a current requirement.
+
+\end{itemize}
+
+\clearpage
+
+\clearpage
 
 
 \bibliographystyle{plain}
