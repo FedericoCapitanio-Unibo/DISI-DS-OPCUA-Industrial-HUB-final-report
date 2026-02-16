@@ -4,8 +4,8 @@
 \usepackage{url}
 \usepackage{natbib}
 \usepackage{graphicx}
-\usepackage{cleveref} % this must be the last package to be loaded
 \usepackage{float}
+\usepackage{cleveref} % this must be the last package to be loaded
 
 \newcommand{\emailaddr}[1]{\href{mailto:#1}{\texttt{#1}}}
 
@@ -1358,19 +1358,16 @@ No master/leader.
 
 Conflicts resolved with Last-Write-Wins (highest LC).
 
+
 \subsubsection{Failure Detection: Gossip Protocol}
 
-\paragraph{Heartbeat Mechanism}
-\begin{itemize}
-    \item Interval: 5s;
-    \item Timeout: 3s each ping;
-    \item Threshold: 3 missed heartbeats (15s) - peer marked as dead.
-\end{itemize}
+The Gossip protocol implements distributed failure detection through the heartbeat 
+mechanism described in \cref{interaction}. The protocol provides:
 
 \paragraph{Properties}
 \begin{itemize}
-    \item \textbf{Strong Completeness}: every failed node detected by all survivors
-    (if the network is potentially reliable)
+    \item \textbf{Strong Completeness}: every failed node eventually detected by all survivors
+    (if the network is eventually reliable)
     \item \textbf{Weak Accuracy}: possible false positives (slow node marked as dead),
     but automatic recovery when heartbeat resumes
 \end{itemize}
@@ -1388,14 +1385,20 @@ Conflicts resolved with Last-Write-Wins (highest LC).
 
 \subsection{Availability}\label{availability}
 
-\subsubsection{Load Balancing}
+\subsubsection{Load Balancing and Failure Recovery}
 
-nginx round-robin on available nodes:
-\begin{itemize}
-    \item Health check: GET \texttt{/api/v1/health} every 30 seconds;
-    \item Failure: automatic removal after 1 failed check;
-    \item Recovery: automatic re-add after 1 successful check.
-\end{itemize}
+The nginx load balancer described in \cref{infrastructure} implements automatic failure 
+recovery through active health monitoring. When a node fails, nginx:
+
+\begin{enumerate}
+    \item Detects failure via health check (GET \texttt{/api/v1/health} returns 5xx or timeout);
+    \item Removes node from routing pool after 1 failed check;
+    \item Continues routing to healthy nodes without service interruption;
+    \item Periodically retries failed node (every 30s);
+    \item Automatically re-adds node when health check succeeds.
+\end{enumerate}
+
+This provides seamless failover with zero client-visible downtime.
 
 
 \subsubsection{Behavior Under Network Partitioning}
@@ -1408,8 +1411,9 @@ Cluster splitted: Partition 1 (Node A, B) | Partition 2 (Node C)
     \item \textbf{Availability Preserved}: both partitions continue OPC UA collection
     + client server + save local DB;
     
-    \item \textbf{Eventual-Consistency Temporarily Lost}: Node C does not receive data from A/B and vice versa.
-    Clients see divergent states;
+    \item \textbf{Consistency Temporarily Lost}: The eventual consistency model described 
+    in \cref{data-and-consistency-issues} is temporarily violated during partition. Node C 
+    does not receive data from A/B and vice versa. Clients see divergent states.
     
     \item \textbf{Failure Detection}: Partition 1 mark C dead, Partition 2 mark A/B dead (Gossip);
     
@@ -1484,31 +1488,6 @@ HMAC-SHA256 with 32+ secret char (JWT\_SECRET env). Key rotation not implemented
 \paragraph{Password Hashing}
 Currently plaintext in env (demo). Production: bcrypt/argon2 con salt.
 
-\subsubsection{Threat Model}
-
-% \begin{table}[h]
-% \centering
-% \small
-% \begin{tabular}{|p{4cm}|p{5cm}|p{5cm}|}
-% \hline
-% \textbf{Threat} & \textbf{Attack} & \textbf{Mitigation} \\
-% \hline
-% Unauthorized access & Client senza JWT & JWT verification \\
-% Privilege escalation & User - admin API & RBAC verify\_admin \\
-% MITM & Network sniffing & TLS 1.3 \\
-% Token theft & JWT leaked & Short expiration (24h) + HTTPS \\
-% Brute force & Password guessing & Rate limiting (nginx) \\
-% SQL injection & Malicious params & SQLAlchemy ORM \\
-% DoS & Flood requests & nginx rate + connection limits \\
-% \hline
-% \end{tabular}
-% \caption{Threat model e mitigazioni}
-% \label{tab:threat-model}
-% \end{table}
-
-\paragraph{Known Limitations}
-No token revocation (stateless JWT), no password hashing, no audit logging, no per-user
-rate limiting. Acceptable for academic prototypes.
 
 \clearpage
 
@@ -1563,17 +1542,25 @@ blocking database calls would block the event loop, preventing concurrent reques
 
 \subsection{Authentication and Authorization}\label{auth-implementation}
 
-The JWT implementation uses the python-jose library, chosen for being lightweight (no heavy
-dependencies), supporting HS256/RS256/ES256 algorithms, actively maintained, and consistent with FastAPI
-ecosystem examples. Token generation encodes payload with subject, role, scope, expiration (24h), and
-issued-at claim, signing with shared secret JWT\_SECRET using HS256. Token verification decodes
-with secret, validating signature and expiration, raising HTTPException 401 for invalid tokens.
-JWT\_SECRET using HS256. Token verification decodes with secret, validating signature
-and expiration, raising HTTPException 401 for invalid tokens.
+The JWT authentication flow described in \cref{security} is implemented using the 
+python-jose library, chosen for being lightweight (no heavy dependencies), supporting 
+HS256/RS256/ES256 algorithms, actively maintained, and consistent with FastAPI 
+ecosystem examples.
 
-RBAC enforcement uses FastAPI Dependency Injection pattern: dependency \texttt{verify\_admin()}
-checks role equals “admin”, raising HTTPException 403 otherwise. Admin endpoints
-declare this dependency, making them unreachable for non-admin tokens.
+\paragraph{Implementation Details}
+\begin{itemize}
+    \item \textbf{Library}: python-jose with HMAC-SHA256 signing
+    \item \textbf{Token Generation}: Encodes claims (sub, role, scopes, exp, iat) 
+    and signs with shared secret JWT\_SECRET
+    \item \textbf{Token Verification}: Decodes with secret, validates signature and 
+    expiration, raises HTTPException 401 for invalid tokens
+    \item \textbf{Secret Management}: JWT\_SECRET shared among HUB nodes via environment 
+    variables (auto-generated during setup)
+\end{itemize}
+
+RBAC enforcement uses FastAPI Dependency Injection pattern: dependency 
+\texttt{verify\_admin()} checks role equals "admin", raising HTTPException 403 otherwise.
+
 
 \subsection{Technology Stack}\label{technological-details}
 
@@ -2472,13 +2459,13 @@ final product's strengths and weaknesses.
 
 My role covered all aspects of the distributed system development:
 
-\begin{description}
-    \item[System Architect] Defined the Hybrid Client-Server/P2P architecture and 
+\begin{itemize}
+    \item\textbf{System Architect}: Defined the Hybrid Client-Server/P2P architecture and 
     selected the AP (Availability/Partition Tolerance) positioning in the CAP theorem 
     to prioritize 24/7 industrial monitoring over strong consistency. Designed the 
     leaderless multi-master replication strategy using Lamport clocks for ordering.
     
-    \item[Backend Engineer] Implemented the three core distributed protocols:
+    \item\textbf{Backend Engineer}: Implemented the three core distributed protocols:
     \begin{itemize}
         \item Gossip Protocol for failure detection with configurable heartbeat intervals;
         \item Anti-Entropy Protocol for pull-based eventual consistency;
@@ -2487,26 +2474,26 @@ My role covered all aspects of the distributed system development:
     Developed the REST API layer using FastAPI with JWT authentication and RBAC 
     authorization, integrating SQLAlchemy async ORM for database operations.
     
-    \item[DevOps Engineer] Orchestrated the multi-container deployment using Docker 
+    \item\textbf{DevOps Engineer}: Orchestrated the multi-container deployment using Docker 
     Compose, configured nginx as load balancer with TLS termination and health checks, 
     and created automated setup scripts with PowerShell and Bash for credential generation 
     and LS certificates management.
     
-    \item[Quality Assurance] Designed and executed functional tests for
+    \item\textbf{Quality Assurance}: Designed and executed functional tests for
     functional requirements, performance tests and fault tolerance tests including network
     partition simulation with iptables.
     
-    \item[Technical Writer] Produced comprehensive documentation covering architectural 
+    \item\textbf{Technical Writer}: Produced comprehensive documentation covering architectural 
     logic, design patterns, implementation choices, and deployment procedures, 
     with references between requirements and validation results.
-\end{description}
+\end{itemize}
 
 \subsection{Product Assessment}
 
 \subsubsection{Strengths}
 
 \paragraph{Robust Distributed Coordination}
-The system successfully implements sophisticated distributed systems patterns without 
+The system successfully implements distributed systems patterns without 
 a central coordinator. The combination of Gossip Protocol for failure detection, 
 Anti-Entropy Protocol for data synchronization and Lamport Clocks that handle conflict resolution, 
 provides strong eventual consistency guarantees verified through partition testing. 
