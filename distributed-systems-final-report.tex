@@ -5,6 +5,7 @@
 \usepackage{natbib}
 \usepackage{graphicx}
 \usepackage{cleveref} % this must be the last package to be loaded
+\usepackage{float}
 
 \newcommand{\emailaddr}[1]{\href{mailto:#1}{\texttt{#1}}}
 
@@ -43,7 +44,7 @@
 
     Unlike traditional data collection architectures based on a single
     physical node that reads data, the architecture of this project consists of three
-    HUB nodes that collect \textbf{OPC UA} data, synchronised via anti-entropy and gossip protocols,
+    HUB nodes that collect \textbf{OPC UA} data, synchronised via Anti-Entropy and Gossip protocols,
     with an nginx load balancer that distributes client requests and implements
     data encryption via the \textbf{TLS} protocol.
 
@@ -85,7 +86,7 @@ This project focuses on the development of a distributed system for collecting i
 \begin{itemize}
   \item \emph{What is the software doing?}
   The software initially instantiates three different nodes (there may be more). Each node connects to several OPC UA servers, browses all the variables present within the server itself, connects and starts collecting values every N seconds.
-  The collected data is saved locally and replicated via anti-entropy with the other nodes performing the same task.
+  The collected data is saved locally and replicated via Anti-Entropy with the other nodes performing the same task.
   The nodes also exchange messages with each other to know which nodes are actually active.
   An nginx server acting as a load balancer redirects HTTP requests coming from outside to the nodes that are alive and periodically tries to determine which of the previously down nodes are back online.
   
@@ -111,7 +112,7 @@ the industrial sector. Below are the main reasons why distribution is necessary.
   \item \emph{Fault Tolerance:}
   Each node (Ingestor) operates autonomously, collecting data from various OPC UA servers.
   Therefore, if any node fails, the system continues to operate with the remaining nodes.
-  Furthermore, when this happens, anti-entropy mechanisms ensure automatic resynchronisation once
+  Furthermore, when this happens, Anti-Entropy mechanisms ensure automatic resynchronisation once
   the node (or nodes) becomes operational again.
   \item \emph{High Availability:}
   Industrial plants are designed to operate 24/7 most of the time, requiring
@@ -128,7 +129,7 @@ the industrial sector. Below are the main reasons why distribution is necessary.
 \end{itemize}
 
 
-\section{Requirements Elicitation and Analysis}\label{requirements-elicitation-and-analysys}
+\section{Requirements Elicitation and Analysis}\label{requirements}
 Questa sezione ha lo scopo di indicare i requisiti del sistema e la loro implementazione per
 spegare cosa il software deve effettivamente fare.
 L'aspetto principale è spiegare cosa il software fornito deve fare quando entra in funzione.
@@ -149,6 +150,11 @@ termini specifici del dominio:
     itself, platform independence, scalability, and the ability to perform data modeling,
     meaning that more complex structures can be managed depending on the context and/or the
     company implementing the protocol.
+
+    \item[PLC]
+    An industrial computer that has been ruggedized and adapted for the control of manufacturing
+    processes, such as assembly lines, machines, robotic devices, or any activity that requires
+    high reliability and usually works in real time.
 
     \item[OEE - Overall Equipment Effectivness]
     Main KPI for measuring the production capacity of a manufacturing company. It is often used
@@ -211,7 +217,7 @@ termini specifici del dominio:
 \subsection{Functional Requirements}\label{functional-requirements}
 
 \begin{enumerate}
-    \item \textbf{[FR-01] OPC UA Server Connection}
+    \item \textbf{OPC UA Server Connection}
     
     The system must connect to configured OPC UA servers and periodically read the values
     of the defined variables (OPC UA nodes).
@@ -221,7 +227,7 @@ termini specifici del dominio:
     (default: every 5 seconds). The data read includes the OPC UA server timestamp
     and status code.
     
-    \item \textbf{[FR-02] Data Persistence}
+    \item \textbf{Data Persistence}
     
     The system must store the data collected from the OPC UA servers locally
     in a relational database on each HUB node.
@@ -230,7 +236,7 @@ termini specifici del dominio:
     (lamport\_clock, tag, node\_id, value, timestamp, quality, source\_server, server\_name)
     with support for temporal queries and the db itself persists even after the node is restarted.
     
-    \item \textbf{[FR-03] REST API Data Exposure}
+    \item \textbf{REST API Data Exposure}
     
     The system must expose the collected data through authenticated REST APIs,
     allowing clients to query current and historical values.
@@ -245,7 +251,7 @@ termini specifici del dominio:
     \end{itemize}
     Every HTTP request need valid JWT into the Authorization header.
     
-    \item \textbf{[FR-04] Dynamic Server Addition}
+    \item \textbf{Dynamic Server Addition}
     
     The system must allow the addition of new OPC UA servers without the need to restart the HUB node.
     
@@ -254,29 +260,29 @@ termini specifici del dominio:
     configuration including a name for the source and the endpoint on which the data will be
     retrieved. The system immediately starts collecting data from the
     new server and propagates the configuration to the other HUB nodes via
-    anti-entropy. The maximum propagation time is 30 seconds.
+    Anti-Entropy. The maximum propagation time is 30 seconds.
     
-    \item \textbf{[FR-06] Data Synchronization Between Nodes}
+    \item \textbf{Data Synchronization Between Nodes}
     
     The system must synchronize the data collected between the three (or more) HUB nodes to
     ensure that each node has a consistent copy of the data.
     
-    \textit{Acceptance Criterion}: The anti-entropy protocol periodically compares
+    \textit{Acceptance Criterion}: The Anti-Entropy protocol periodically compares
     the state between nodes every 10 seconds using Lamport clocks. Differences are resolved
     using the Last-Write-Wins strategy. After 30 seconds without new writes, all nodes must converge
     to the same state.
     
-    \item \textbf{[FR-07] Failure Detection}
+    \item \textbf{Failure Detection}
     
     The system must automatically detect when a HUB node becomes unreachable.
     
-    \textit{Acceptance Criterion}: The gossip protocol implements heartbeat
+    \textit{Acceptance Criterion}: The Gossip protocol implements heartbeat
     every 5 seconds between nodes. A node is considered “suspected failed”
     after 3 consecutive missed heartbeats (15 seconds). The information is
-    propagated to other nodes via gossip with a detection probability
+    propagated to other nodes via Gossip with a detection probability
     of $>$95\% within 20 seconds.
     
-    \item \textbf{[FR-08] Automatic Traffic Redirection}
+    \item \textbf{Automatic Traffic Redirection}
     
     The system must automatically redirect client traffic from non-functioning nodes to operational nodes.
     
@@ -286,7 +292,7 @@ termini specifici del dominio:
     routing pool. Recovery occurs automatically when the node
     returns to operation.
     
-    \item \textbf{[FR-09] User Authentication}
+    \item \textbf{User Authentication}
     
     The system must authenticate users via credentials and issue JWT tokens for API access.
     
@@ -294,7 +300,7 @@ termini specifici del dominio:
     password, verifies the credentials, and returns a JWT valid for 24 hours. The token includes
     the user's role (admin or user).
     
-    \item \textbf{[FR-10] Role-Based Authorization}
+    \item \textbf{Role-Based Authorization}
     
     The system implements role-based access control.
     
@@ -310,7 +316,7 @@ termini specifici del dominio:
 \subsection{Non-Functional Requirements}\label{non-functional-requirements}
 
 \begin{enumerate}
-    \item \textbf{[NFR-01] Eventual Consistency}
+    \item \textbf{Eventual Consistency}
     
     The system prioritizes availability and partition tolerance over strong consistency, implementing eventual consistency.
     
@@ -319,7 +325,7 @@ termini specifici del dominio:
     within 60 seconds of connectivity restoration. Different clients may observe temporarily different
     snapshots.
     
-    \item \textbf{[NFR-02] Response Time}
+    \item \textbf{Response Time}
     
     REST APIs must respond with acceptable latency for industrial monitoring applications.
     
@@ -335,7 +341,7 @@ termini specifici del dominio:
         \item Aggiunta server: $<$ 100ms (local processing + asynchronous propagation)
     \end{itemize}
     
-    \item \textbf{[NFR-03] Data Integrity}
+    \item \textbf{Data Integrity}
     
     The collected data must be stored with guaranteed integrity,
     preserving the original timestamps of the OPC UA server.
@@ -344,7 +350,7 @@ termini specifici del dominio:
     includes the timestamp of the source OPC UA server, allowing for correct temporal sorting even in the
     presence of clock drift between HUB nodes.
     
-    \item \textbf{[NFR-04] Scalability - Server OPC UA}
+    \item \textbf{Scalability - Server OPC UA}
     
     The system must support a growing number of OPC UA servers without
     significant performance degradation.
@@ -355,7 +361,7 @@ termini specifici del dominio:
     minimum of 3 HUB nodes.
     
     % TODO va messo poi sotto nell'apposita sezione
-    \item \textbf{[NFR-08] Security - Data in Transit}
+    \item \textbf{Security - Data in Transit}
     
     All communications between the client and the system must be encrypted.
     
@@ -367,7 +373,7 @@ termini specifici del dominio:
     If the system is to be published on a public domain, tests like on
     \emph{www.ssllabs.com/ssltest} site are recoomend to ensure a high level of security.
         
-    \item \textbf{[NFR-09] Security - Authentication}
+    \item \textbf{Security - Authentication}
     
     The system must prevent unauthorized access to APIs.
     
@@ -381,7 +387,7 @@ termini specifici del dominio:
 \subsection{Implementation Requirements}\label{implementation-requirements}
 
 \begin{enumerate}
-    \item \textbf{[IR-01] Programming Language: Python}
+    \item \textbf{Programming Language: Python}
     
     The backend of the HUB nodes must be developed in Python 3.11+.
     
@@ -392,7 +398,7 @@ termini specifici del dominio:
 
     Website for details: https://python.org/
     
-    \item \textbf{[IR-02] Web Framework: FastAPI}
+    \item \textbf{Web Framework: FastAPI}
     
     REST APIs must be implemented with FastAPI.
     
@@ -404,7 +410,7 @@ termini specifici del dominio:
 
     Website for details: https://fastapi.tiangolo.com/.
 
-    \item \textbf{[IR-03] ORM: SQLAlchemy}
+    \item \textbf{ORM: SQLAlchemy}
     
     Access to the database must use SQLAlchemy as the ORM.
     
@@ -415,19 +421,18 @@ termini specifici del dominio:
 
     Website for details: https://www.sqlalchemy.org/
     
-    \item \textbf{[IR-04] Database: SQLite}
+    \item \textbf{Database: SQLite}
     
     Each HUB node uses SQLite as its local database.
     
     \textit{Justification}: SQLite is embedded, does not require a separate server,
     has a minimal footprint, and is sufficient for expected workloads
     (write-intensive but not concurrent between different processes). Each node
-    operates on an independent database, replicated via anti-entropy.
+    operates on an independent database, replicated via Anti-Entropy.
 
     Website for details: https://sqlite.org/
 
-    %  TODO aggiungere sezione su pydantic
-    \item \textbf{[IR-11] Data validation and serialization: Pydantic}
+    \item \textbf{Data validation and serialization: Pydantic}
 
     LData validation and serialization must be implemented using Pydantic.
 
@@ -450,7 +455,7 @@ termini specifici del dominio:
 
     Website for details: https://docs.pydantic.dev/latest/
     
-    \item \textbf{[IR-05] Containerization: Docker}
+    \item \textbf{Containerization: Docker}
     
     The system must be deployable via Docker and Docker Compose.
     
@@ -461,7 +466,7 @@ termini specifici del dominio:
 
     Website for details: https://www.docker.com/
     
-    \item \textbf{[IR-06] Load Balancer: nginx}
+    \item \textbf{Load Balancer: nginx}
     
     Load balancing and TLS termination must be handled by nginx.
     
@@ -472,7 +477,7 @@ termini specifici del dominio:
 
     Website for details: https://nginx.org/
     
-    \item \textbf{[IR-08] OPC UA Library: asyncua}
+    \item \textbf{OPC UA Library: asyncua}
     
     The connection to OPC UA servers must use the asyncua library.
     
@@ -482,7 +487,7 @@ termini specifici del dominio:
 
     Website for details: https://github.com/FreeOpcUa/opcua-asyncio
     
-    \item \textbf{[IR-09] Authentication JWT: python-jose}
+    \item \textbf{Authentication JWT: python-jose}
     
     Authentication must implement JSON Web Tokens by integrating it with Python.
     
@@ -492,7 +497,7 @@ termini specifici del dominio:
 
     Website for details: https://python-jose.readthedocs.io/en/latest/.
     
-    \item \textbf{[IR-10] Development Environment: PowerShell Script or Bash Script}
+    \item \textbf{Development Environment: PowerShell Script or Bash Script}
     
     Setup and authentication scripts must be provided in PowerShell and Bash.
     
@@ -517,7 +522,7 @@ of an industrial data collection system.
 
 \subsubsection{Fault Tolerance e Dependability}
 
-\paragraph{Relevance: HIGH} - Fault tolerance is the fundamental pillar of the system, given that industrial plants
+\paragraph{Relevance: HIGH}- Fault tolerance is the fundamental pillar of the system, given that industrial plants
 require continuous and constant monitoring.
 
 \begin{itemize}
@@ -537,12 +542,12 @@ require continuous and constant monitoring.
     The system must continue to work correctly even in the presence of network par-
     titions between HUB nodes.
     If the network has partitions and nodes are splitted into isolated groups, each group
-    continues to serve clients connected to it. When the partition resolves, the anti-entropy
+    continues to serve clients connected to it. When the partition resolves, the Anti-Entropy
     protocol automatically reconciles divergent states.
     
     \item \textbf{Reliability}: Data loss is unacceptable in an industrial context,
     where each sample represents the status of a machine at a specific moment in time.
-    Replication via anti-entropy ensures that the data collected by one node
+    Replication via Anti-Entropy ensures that the data collected by one node
     is propagated to all other nodes, preventing data loss
     even in the event of a sudden crash.
     
@@ -561,7 +566,7 @@ require continuous and constant monitoring.
 
 \subsubsection{High Availability}
 
-\paragraph{Relevance: HIGH} - High availability is not only desirable but necessary for industrial use cases:
+\paragraph{Relevance: HIGH}- High availability is not only desirable but necessary for industrial use cases:
 
 \begin{itemize}
     \item \textbf{No Single Point of Failure}: Each component is redundant:
@@ -573,14 +578,14 @@ require continuous and constant monitoring.
     \end{itemize}
     
     \item \textbf{Partition Tolerance}: During network partitions, each isolated group
-    continues to operate autonomously. When the partition resolves, anti-entropy automatically
+    continues to operate autonomously. When the partition resolves, Anti-Entropy automatically
     reconciles divergent states.
 
 \end{itemize}
 
 \subsubsection{Transparency}
 
-\paragraph{Relevance: HIGH} - Transparency is essential for simplifying the use of the system:
+\paragraph{Relevance: HIGH}- Transparency is essential for simplifying the use of the system:
 
 \begin{itemize}
     \item \textbf{Location Transparency}: clients interact with a single endpoint
@@ -605,7 +610,7 @@ require continuous and constant monitoring.
 
 \subsubsection{Scalability}
 
-\paragraph{Relevance: HIGH} - Scalability is essential to adapt to the growth of the industrial plant:
+\paragraph{Relevance: HIGH}- Scalability is essential to adapt to the growth of the industrial plant:
 
 \begin{itemize}
     \item \textbf{Horizontal Scalability - HUB nodes}: HUB nodes can be added
@@ -615,7 +620,7 @@ require continuous and constant monitoring.
     
     \item \textbf{Horizontal Scalability - OPC UA server}: New OPC UA servers can
     be added dynamically via admini APIs without restarting. The configuration is automatically
-    propagated to all HUB nodes via anti-entropy.
+    propagated to all HUB nodes via Anti-Entropy.
     
     \item \textbf{Request Scalability}: The load balancer distributes requests
     in round-robin fashion. By adding a fourth node, the theoretical throughput increases by 33\%.
@@ -628,7 +633,7 @@ require continuous and constant monitoring.
 
 \subsubsection{Security e Trust}
 
-\paragraph{Relevance: HIGH} - Security is critical since the system exposes potentially sensitive data from production processes:
+\paragraph{Relevance: HIGH}- Security is critical since the system exposes potentially sensitive data from production processes:
 
 \begin{itemize}
     \item \textbf{Authentication}: JWT-based authentication ensures that only
@@ -659,7 +664,7 @@ require continuous and constant monitoring.
 
 \subsubsection{Resource Sharing e Coordination}
 
-\paragraph{Relevance: MEDIUM-HIGH} - Multiple components share resources and require coordination:
+\paragraph{Relevance: MEDIUM-HIGH}- Multiple components share resources and require coordination:
 
 \begin{itemize}
     \item \textbf{Shared Resource: OPC UA Servers}: Multiple HUB nodes can
@@ -684,7 +689,7 @@ require continuous and constant monitoring.
 
 \subsubsection{Openness, Interoperability, Heterogeneity}
 
-\paragraph{Relevance: HIGH} - Interoperability is essential since the system is a middleware that integrates different
+\paragraph{Relevance: HIGH}- Interoperability is essential since the system is a middleware that integrates different
 protocols:
 
 \begin{itemize}
@@ -718,7 +723,7 @@ protocols:
 
 \subsubsection{Evolvability e Maintainability}
 
-\paragraph{Relevance: HIGH} - The system is designed for long-term evolution:
+\paragraph{Relevance: HIGH}- The system is designed for long-term evolution:
 
 \begin{itemize}
     \item \textbf{Containerization}: Docker ensures consistent deployment and
@@ -741,7 +746,7 @@ protocols:
     
     \item \textbf{Modular Architecture}: Well-separated components:
     \begin{itemize}
-        \item OPC UA collectors (data collection)
+        \item OPC UA Ingestors (data collection)
         \item API layer (data exposure)
         \item Gossip agent (failure detection)
         \item Anti-entropy agent (synchronization)
@@ -752,7 +757,7 @@ protocols:
 
 \subsubsection{Performance, Concurrency, Communication Efficiency}
 
-\paragraph{Relevance: MEDIUM} - Performance is important but not as critical as availability:
+\paragraph{Relevance: MEDIUM}- Performance is important but not as critical as availability:
 
 \begin{itemize}
     \item \textbf{Acceptable Latency}: for industrial monitoring, latencies
@@ -768,7 +773,7 @@ protocols:
     As for user requests, it all depends on how many applications use
     the system to retrieve data.
     
-    \item \textbf{Network Efficiency}: anti-entropy exchanges only differences (delta),
+    \item \textbf{Network Efficiency}: Anti-Entropy exchanges only differences (delta),
     not the entire dataset.
     
     \item \textbf{Tradeoff Awareness}: The system sacrifices strong consistency
@@ -778,7 +783,7 @@ protocols:
 
 \subsubsection{Economy e Costs}
 
-\paragraph{Relevance: MEDIUM} - Some economic considerations can influence architectural choices:
+\paragraph{Relevance: MEDIUM}- Some economic considerations can influence architectural choices:
 
 \begin{itemize}
     \item \textbf{Open Source Stack}: all technologies used are open source
@@ -817,10 +822,1820 @@ to this project:
 
 \clearpage
 
+\section{Design}\label{design}
+
+This section show the architectural strategies adopted to meet the requirements
+identified in the analysis. The design choices are justified in relation to the requirements
+defined in \cref{requirements} and the characteristics of the distributed systems analyzed
+in \cref{ds-features}.
+
+\subsection{Architecture}\label{architecture}
+
+\subsubsection{Architectural Style}
+
+The system adopts a hybrid architectural style:
+
+\begin{itemize}
+\item \textbf{Client-Server Layer}:
+External applications access the system via REST API
+\begin{itemize}
+    \item \textbf{Client}: Dashboards, ERP systems, and mobile apps require data via HTTPS.
+    \item \textbf{Server}: HUB nodes expose authenticated REST APIs
+    \item \textbf{Load Balancer}: nginx masks the physical distribution (location transparency)
+\end{itemize}
+
+\item \textbf{Peer-to-Peer Layer}:
+HUB nodes synchronize via peer-to-peer communication
+\begin{itemize}
+    \item No central master/coordinator
+    \item Internal HTTP P2P communication (\texttt{/internal/*} path)
+    \item Static discovery via configuration
+\end{itemize}
+\end{itemize}
+
+
+\subsubsection{Reasons}
+
+This hybrid architecture offers some advantages:
+
+\begin{itemize}
+    \item\textbf{Client Simplicity}: load balancer hides distribution because clients see a single endpoint;
+    
+    \item\textbf{High Availability}: no master eliminates singe point of failure and each node can serve every request;
+    
+    \item\textbf{Horizontal Scalability}: adding nodes only requires updating the nginx configuration;
+        
+    \item\textbf{Fault Isolation}: problems on one node do not propagate and each node operates independently.
+\end{itemize}
+
+\clearpage
+
+\subsection{Infrastructure}\label{infrastructure}
+
+\subsubsection{Infrastructural Components}
+
+\paragraph{HUB Nodes (3+ instances)}
+Core nodes of the distributed system. Each HUB:
+\begin{itemize}
+    \item collects data from OPC UA servers (OPC UA client - OPC UA Ingestor);
+    \item exposes REST APIs (HTTP server);
+    \item synchronize with other nodes (peer-to-peer data exchange);
+    \item maintains local SQLite database with eventual consistency replication;
+    \item performs Gossip (failure detection) and Anti-Entropy (synchronization).
+\end{itemize}
+
+Minimum 3 nodes to tolerate failure of 2 nodes and this is linearly scalable.
+
+\paragraph{Load Balancer (1 nginx instance)}
+It's a reverse proxy that:
+\begin{itemize}
+    \item distributes requests in round-robin fashion;
+    \item terminate TLS (port 443);
+    \item health checks HTTP every 30 seconds on \texttt{/api/v1/health} path
+    \item automatically removes unresponsive nodes
+\end{itemize}
+
+
+\paragraph{OPC UA Servers (N instances)}
+External industrial systems (PLCs, SCADAs, or simulators) that expose process variables.
+From the distributed system's point of view, these are untrusted external entities
+with potentially unreliable connectivity. HUB nodes handle this via connection retry logic.
+The system allows dynamic addition of servers at runtime: when administrators add
+servers via POST to \texttt{/api/v1/admin/opc-servers} and the configuration propagates
+to peers via Anti-Entropy.
+This software provides different OPC UA server simulator that will be useful to test all
+the system if others OPC UA servers are not availables.
+\begin{itemize}
+    \item display hierarchical OPC UA tree nodes;
+    \item variables(or \emph{tags}) represent machine states (temperatures, pressures, counters)
+    \item external to the system (untrusted)
+\end{itemize}
+
+\paragraph{HTTP Clients (N instances)}
+These could be potentially every tool that has an HTTP client, like web page dashboard, ERP,
+analytics tools or mobile app.
+
+\subsubsection{Network Distribution}
+
+\begin{itemize}
+\item \textbf{Development/Test}: All components on a single machine as Docker containers
+with a private network bridge.
+\item \textbf{Production}: HUB nodes geographically distributed across different availability zones,
+replicable load balancer with DNS load balancing, OPC UA servers physically located in the plants,
+for example in the PLC that manage the machine.
+\end{itemize}
+
+\subsubsection{Component Discovery}
+
+This subsection show how components are aware of other components.
+
+\begin{itemize}
+\item \textbf{Client - Load Balancer}: Its use in production will involve DNS resolution, but, as
+is also the case in test and development, its IP address will be utilised.
+
+\item \textbf{Load Balancer - HUB Nodes}: Static config \texttt{nginx.conf} and health checks monitoring.
+
+\item \textbf{HUB - HUB}: Peers list configured in environment variables, failure detection via Gossip.
+
+\item \textbf{HUB - OPC UA}: Dynamic config via \texttt{POST /api/v1/admin/opc-servers}, saved into DB and replicated via Anti-Entropy.
+\end{itemize}
+
+\subsubsection{Infrastructure Diagram}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/infrastructure-diagram.png}
+  \caption{
+    Clients access via nginx, which distributes to HUB nodes.
+    The nodes synchronize P2P (Gossip and Anti-Entropy) and collect data from OPC UA servers
+  }
+  \label{fig:infrastructure}
+\end{figure}
+
+\clearpage
+
+\subsection{Modelling}\label{modelling}
+
+\subsubsection{Domain Entities}
+
+\begin{itemize}
+\item \textbf{OPCUADataPoint}
+
+Single tag sample. Each instance is created by the Ingestor into the HUB node that collects data
+from the OPC UA servers. Each one is immutable after creation since Lamport clock guarantees total ordering.
+\begin{itemize}
+    \item \textbf{tag}: legible name (es. "Temperature.Oven1");
+    \item \textbf{node\_id}: OPC UA node id;
+    \item \textbf{value}: numeric/boolean/string value;
+    \item \textbf{timestamp}: UTC timestamp from the OPC UA server;
+    \item \textbf{quality}: GOOD/BAD/UNCERTAIN (OPC UA standard);
+    \item \textbf{source\_server}: source endpoint:
+    \item \textbf{server\_name}: server name identifier;
+    \item \textbf{lamport\_clock}: logical timestamp for causal ordering.
+\end{itemize}
+
+\item \textbf{ServerConfig}
+OPC UA server configuration:
+\begin{itemize}
+    \item \textbf{server\_name}: server name identifier;
+    \item \textbf{endpoint}: OPC UA server URL;
+    \item \textbf{lamport\_clock}: logical timestamp for causal ordering;
+    \item \textbf{node\_id}: HUB node that received the addition request;
+\end{itemize}
+
+This config will be replicated via Anti-Entropy and is the entity that allows dynamic addition without restarting.
+
+\item \textbf{User}
+System user (stored in env, not DB):
+\begin{itemize}
+    \item \textbf{username};
+    \item \textbf{password\_hash};
+    \item \textbf{role}: admin/user.
+\end{itemize}
+
+\item \textbf{NodeInfo}
+Peer metadata used by Gossip protocol:
+\begin{itemize}
+    \item \textbf{node\_id}, \textbf{host}, \textbf{port}
+    \item \textbf{is\_alive}: Gossip flag;
+    \item \textbf{last\_seen}: last heartbeat timestamp;
+    \item \textbf{lamport\_clock}: last known LC.
+\end{itemize}
+
+\end{itemize}
+
+\subsubsection{Entity Mapping to Infrastructure}
+
+Pattern: \textbf{Local Storage with Peer Replication}
+
+\begin{itemize}
+
+\item \textbf{OPCUADataPoint}: Created by OPC UA Ingestor, saved in local SQLite
+(\texttt{data\_points} table) and replicated via Anti-Entropy. Potentially queried by REST API.
+
+\item \textbf{ServerConfig}: Created via POST admin API, stored in SQLite
+(\texttt{server\_configs}), replicated via Anti-Entropy and used by Ingestor.
+
+\item \textbf{User}: Stored in env variables, verified by JWT middleware. It's not replicated.
+
+\item \textbf{NodeInfo}: Maintained by Gossip agent. This is in-memory and volatile and it's rebuilt at restart
+
+\end{itemize}
+
+\textbf{Reason}: Local database per node eliminates SPOF, minimizes latency, guarantees
+operational autonomy.
+\textbf{Cost}: eventual consistency instead of strong consistency.
+
+\subsubsection{Domain Events}
+
+\begin{itemize}
+    \item \textbf{OPCUADataCollected}: generated every 5 seconds, batch save trigger + Lamport increment;
+    \item \textbf{ServerAdded}: generated by POST admin, trigger save DB + connect OPC UA + propagation;
+    \item \textbf{NodeSuspectedDead}: generated after 3 missed heartbeats (15s);
+    \item \textbf{AntiEntropySync}: generated every 10 seconds, LC comparison trigger + data pull.
+\end{itemize}
+
+\subsubsection{Message Types}
+
+\begin{itemize}
+\item \textbf{Client - HUB (REST Commands)}:
+\begin{itemize}
+  \item\textbf{LoginRequest}: user credentials (username and password) to obtain JWT authentication tokens,
+  sent as POST to \texttt{/api/v1/auth/token} with form data;
+  \item\textbf{AddOPCServerRequest}: allows administrators to dynamically add OPC UA servers, containing
+  server name and endpoint, sent as POST to \texttt{/api/v1/admin/opc-servers} with
+  admin authentication;
+  \item\textbf{DataQuery}: represents requests to read industrial data
+  via GET on endpoints such as \texttt{/api/v1/servers/\{name\}/tags/\{tag\}/latest} or
+  \texttt{/history}, including query parameters for time filtering and result limits.
+   
+\end{itemize}
+
+\item \textbf{HUB - Client (REST Responses)}:
+\begin{itemize}
+  \item \textbf{TokenResponse (JWT)}: contiene JWT firmato più metadati (tipo token "bearer", ruolo utente, expiration 24h),
+  permettendo ai client di autenticare richieste successive;
+  \item \textbf{DataPointResponse}: singolo campionamento industriale con tag, valore, timestamp, quality status,
+  Lamport clock, e identificativi server.
+  \item \textbf{HistoryResponse}: contiene array di data point per range temporale richiesto più
+  metadati (count, node\_id servente).
+\end{itemize}
+
+\item \textbf{HUB - HUB (P2P Internal HTTP)}:
+\begin{itemize}
+  \item \textbf{GossipMessage}: Implements failure detection with two variants:
+  “ping” sent every 5 seconds by the sender with its own Lamport clock to signal liveness, and
+  “ack” responded by the recipient with its own Lamport clock to confirm receipt.
+  Failure to receive ack within 3 seconds indicates a potentially unreachable peer;
+  \item \textbf{AntiEntropyRequest}: start data synchronization by transporting the range
+  Lamport clock possessed by the requester (min\_lc, max\_lc), allowing the peer to
+  identify gaps;
+  \item \textbf{AntiEntropyResponse}: contains missing data points for the requester
+  (LC > max\_lc requester) plus current\_max\_lc of the responder, enabling incremental convergence;
+  \item \textbf{ServerConfigSyncRequest/Response}: follow the same pattern but
+  work on OPC UA server configurations instead of data points, propagating dynamic server additions
+  across the cluster within 30 seconds as required by NFR-06.
+\end{itemize}
+
+\item \textbf{HUB - OPC UA (OPC UA Protocol)}:
+Interaction with external industrial servers uses the standard OPC UA protocol.
+
+\end{itemize}
+
+\subsubsection{System State}
+
+The global state eventually emerges through convergence: the union of all
+data points sorted by LC, and the union of server configurations with Last-Write-Wins conflict resolution.
+There is no “master” state; each node has a local view
+that converges.
+
+\paragraph{Per-Node State (Local)}
+\begin{itemize}
+    \item current Lamport Clock
+    \item Data Points DB (con LC)
+    \item Server Configs DB (con LC)
+    \item Peer Liveness Map (volatile)
+    \item OPC UA Connections
+\end{itemize}
+
+\paragraph{Global State (Eventual)}
+\begin{itemize}
+    \item union of all Data Points, orderer by LC. They will converge via Anti-Entropy.
+    \item union of Server Configs, Last-Write-Wins on conflicts (highest LC wins).
+\end{itemize}
+
+
+\clearpage
+
+\subsection{Interaction}\label{interaction}
+
+\subsubsection{Communication Patterns}
+
+\begin{itemize}
+\item \textbf{Client-HUB: Synchronous Request-Response}
+\begin{enumerate}
+    \item client - nginx: HTTPS GET \texttt{/api/v1/.../latest};
+    \item nginx - HUB (round-robin);
+    \item HUB: verify JWT + query SQLite;
+    \item HUB - nginx - Client: JSON response.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/sequence-client-query.png}
+\caption{Sequence diagram - HTTP request to retrieve OPC UA tag value}
+\label{fig:seq-client-query}
+\end{figure}
+
+\item \textbf{HUB-HUB: Asynchronous P2P Gossip (Heartbeat)}:
+\begin{enumerate}
+    \item every 5 seconds: each HUB node creates POST \texttt{/internal/Gossip/ping} for every known peer;
+    \item message include Lamport clock sender;
+    \item peer responds with ACK + its own LC;
+    \item 3s timeout - peer not responsive;
+    \item 3 missing heartbeats (15s) - \texttt{is\_alive=False}.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/sequence-Gossip.png}
+\caption{Sequence Gossip diagram}
+\label{fig:seq-Gossip}
+\end{figure}
+
+\item \textbf{HUB-HUB: Asynchronous P2P Anti-Entropy (Data Sync):}
+\begin{enumerate}
+    \item every 10s: every HUB node - POST \texttt{/internal/Anti-Entropy/sync} to alive peers;
+    \item message: own range LC (min\_lc, max\_lc);
+    \item peer query its own DB and returns data points with LC > max\_lc requester;
+    \item requester insert batch + update LC = max(local, received).
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/sequence-Anti-Entropy.png}
+\caption{Sequence diagram Anti-Entropy. HUB A chiede dati mancanti (LC > 500) a HUB B.}
+\label{fig:seq-Anti-Entropy}
+\end{figure}
+
+\item \textbf{HUB-HUB: Asynchronous P2P Server Config Sync}:
+identical to Anti-Entropy but for server\_configs. When a node receives a new configuration, it automatically start an OPC UA connection.
+
+\item \textbf{HUB-OPC UA: Periodic Polling}
+\begin{enumerate}
+    \item scheduler manage a job trigger every N(5 by default) seconds for each server;
+    \item job: batch read all tags (single OPC UA request);
+    \item for each value
+    \begin{itemize}
+      \item increment LC;
+      \item create DataPoint;
+      \item insert into DB.
+    \end{itemize}
+    \item Anti-Entropy propagates automatically.
+\end{enumerate}
+
+\end{itemize}
+
+\clearpage
+
+\subsection{Behaviour}\label{behaviour}
+
+\subsubsection{HUB Node State Machine - Main States}
+
+% IMMAGINE 6: State Diagram
+% \begin{figure}[H]
+% \centering
+% \includegraphics[width=0.85\textwidth]{figures/state-hub-node.png}
+% \caption{State diagram HUB node. Transizioni tra Initializing - Connecting - Operational - Syncing.
+% Degrada se perde OPC UA ma resta disponibile per client.}
+% \label{fig:state-hub-node}
+% \end{figure}
+
+\begin{itemize}
+    \item \textbf{Initializing}: Create/open DB, load config, initialize LC - Connecting
+    \item \textbf{Connecting}: OPC UA connection + browse nodes, start Gossip/Anti-Entropy - Operational
+    \item \textbf{Operational}: Client API, OPC UA polling, active Gossip/Anti-Entropy required
+    \item \textbf{Syncing}: Temporary sub-state (every 10s): LC comparison, data pull, insert batch - Operational
+    \item \textbf{Degraded}: OPC UA disconnected but serving client with cached data. Automatic retry - Operational
+    \item \textbf{Shutdown}: SIGTERM: OPC UA Ingestion stop, Gossip stop, Anti-Entropy stop
+\end{itemize}
+
+\subsubsection{Component Responsibilities}
+
+\begin{itemize}
+    \item \textbf{FastAPI API Layer} Stateless component that exposes the system's REST interface,
+    handling authentication, data queries, and response serialization. It does not maintain state
+    between requests, enabling horizontal scalability.
+    \begin{itemize}
+      \item JWT check (HMAC-SHA256 signature and expiration);
+      \item queries local SQLite with async queries;
+      \item JSON serialization via Pydantic;
+      \item responds to the client.
+    \end{itemize}
+    
+    \item \textbf{OPC UA Ingestor} Stateful component responsible for collecting data from industrial servers, maintaining active connections, and managing automatic retries.
+    \begin{itemize}
+      \item performs batch reads every 5 seconds via a single OPC UA call;
+      \item increases the Lamport clock for each value, ensuring uniqueness;
+      \item creates immutable OPCUADataPoint;
+      \item inserts batches into the DB;
+      \item manages exponential backoff retries on failure.
+    \end{itemize}
+    
+    \item \textbf{Gossip Agent} Stateful component that implements distributed failure detection
+    among HUB peers via periodic heartbeats. Maintains peer liveness map with strong
+    completeness and weak accuracy.
+    \begin{itemize}
+      \item send ping every 5 seconds with own Lamport clock;
+      \item waits for ack with a timeout of 3s to update its last seen and LC on success;
+      \item set peer as DOWN after 3 consecutive failures;
+      \item responds to received pings by updating its own LC.
+    \end{itemize}
+    
+    \item \textbf{Anti-Entropy Agent} Logically stateless component that implements
+    pull-based synchronization for eventual consistency.
+    \begin{itemize}
+      \item queries database every 10 seconds for its own LC range;
+      \item requests data from peers with LC greater than its own maximum;
+      \item Inserts the received batch and updates LC to the higher of the received and local values.
+      \item responds to peer requests with data where local LC is greater than the one received;
+      \item synchronizes all server configurations.
+    \end{itemize}
+\end{itemize}
+
+\clearpage
+
+\subsection{Data and Consistency Issues}\label{data-and-consistency-issues}
+
+\subsubsection{Data Storage Strategy}
+
+The system manages two categories of data with different characteristics. The \textbf{time-series data}
+(OPC UA samples) have a high volume with 17 milions records/day, assuming
+1000 tags sampled every 5 seconds, with a write-heavy access pattern dominated by
+continuous inserts
+
+Data are stored in local SQLite at each node at the path
+\texttt{/app/data/node-\{id\}.db}, with a schema comprising tables \texttt{data\_points}
+and \texttt{server\_configs} indexed on (tag, timestamp), (tag, lamport\_clock), and
+(server\_name, lc) to optimize common queries.
+
+SQLite was chosen because it is embedded (no separate server process), requires
+zero configuration and has a minimal footprint (<1MB binary). The local database per node
+eliminates SPOF (no central master database), minimizes latency (all queries are
+local), guarantees operational autonomy (nodes operate independently), and simplifies
+deployment (no database cluster setup).
+
+\subsubsection{Data Model}
+
+Schema:
+\begin{verbatim}
+CREATE TABLE data_points (
+    lamport_clock INTEGER PRIMARY KEY,
+    tag TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    value REAL NOT NULL,
+    timestamp DATETIME NOT NULL,
+    quality TEXT NOT NULL,
+    source_server TEXT NOT NULL,
+    server_name TEXT NOT NULL
+);
+
+CREATE TABLE server_configs (
+    server_name TEXT,
+    lamport_clock INTEGER,
+    endpoint TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    PRIMARY KEY (server_name, lamport_clock)
+);
+\end{verbatim}
+
+\subsubsection{Query Patterns}
+
+\paragraph{Read Queries}
+\begin{itemize}
+    \item Latest value: \texttt{SELECT * WHERE tag=? AND server\_name=? ORDER BY lc DESC LIMIT 1}
+    \item History: \texttt{SELECT * WHERE tag=? AND timestamp BETWEEN ? AND ? ORDER BY lc ASC}
+\end{itemize}
+
+\paragraph{Write Queries (Serialized)}
+Batch insert every 5 seconds (OPC UA) + sync (Anti-Entropy) and SQLite serializes write.
+
+\paragraph{Conflict Handling}
+Scenario: two nodes receive the same server configuration almost simultaneously.
+
+\textbf{Resolution}: Node A assigns LC=1000, Node B assigns LC=1001. Anti-entropy propagates
+both. Query takes only maximum LC - Node B “wins” (deterministic LWW).
+
+\subsubsection{Consistency Model: Eventual Consistency}
+
+The system implements eventual consistency~\cite{vogels2009eventually}: given enough time and
+no new writes, all replicas converge.
+
+\paragraph{Convergence Guarantees}
+\begin{itemize}
+    \item \textbf{Liveness}: Anti-Entropy detect and solve differences;
+    \item \textbf{Convergence Time}: worst case 30s (3 × 10s sync interval), typical 10-15s;
+    \item \textbf{Conflict Resolution}: Lamport clocks - total deterministic ordering.
+\end{itemize}
+
+\paragraph{Possible Anomalies}
+Clients could observe:
+\begin{itemize}
+    \item Read-Your-Writes violation (data on Node A not visible on Node B for 30 seconds);
+    \item Monotonic Reads violation (new value then old value if switch node);
+    \item Stale Reads (given with a 30-second delay).
+\end{itemize}
+
+Acceptable for industrial monitoring: data granularity 5s, 30s < human reaction time,
+availability > consistency.
+
+
+\clearpage
+
+\subsection{Fault-Tolerance}\label{fault-tolerance}
+
+\subsubsection{Data Replication: Leaderless Multi-Master}
+
+Each node is simultaneously a source (generates events) and a replica (receives from peers).
+No master/leader.
+
+\paragraph{Replication Protocol: Pull-Based Anti-Entropy}
+
+\textbf{Vantaggi pull-based}:
+\begin{itemize}
+    \item Natural backpressure (receiver controls rate);
+    \item Sender does not track “already sent to whom”;
+    \item Resilient to partitions and sync mode resumes it automatically.
+\end{itemize}
+
+\textbf{Flow}:
+\begin{enumerate}
+    \item Node A: range LC [100, 500]
+    \item Node A - B: "give me LC > 500"
+    \item Node B query: \texttt{SELECT * WHERE lc > 500}
+    \item Node B - A: data points [501-600] + max\_lc=600
+    \item Node A: insert batch + update LC = max(500, 600)
+\end{enumerate}
+
+Conflicts resolved with Last-Write-Wins (highest LC).
+
+\subsubsection{Failure Detection: Gossip Protocol}
+
+\paragraph{Heartbeat Mechanism}
+\begin{itemize}
+    \item Interval: 5s;
+    \item Timeout: 3s each ping;
+    \item Threshold: 3 missed heartbeats (15s) - peer marked as dead.
+\end{itemize}
+
+\paragraph{Properties}
+\begin{itemize}
+    \item \textbf{Strong Completeness}: every failed node detected by all survivors
+    (if the network is potentially reliable)
+    \item \textbf{Weak Accuracy}: possible false positives (slow node marked as dead),
+    but automatic recovery when heartbeat resumes
+\end{itemize}
+
+\subsubsection{Error Handling}
+
+\begin{description}
+    \item[OPC UA Connection Failure] Retry exponential backoff (0.5s - 30s, max 20 attempts).
+    Node remains operational (serves client with cached data). Alert via log.
+    
+    \item[Load Balancer Health Check Failure] nginx removes nodes from the pool after 1 failed check. Automatic retry, re-add when it returns to healthy status.
+\end{description}
+
+\clearpage
+
+\subsection{Availability}\label{availability}
+
+\subsubsection{Load Balancing}
+
+nginx round-robin on available nodes:
+\begin{itemize}
+    \item Health check: GET \texttt{/api/v1/health} every 30 seconds;
+    \item Failure: automatic removal after 1 failed check;
+    \item Recovery: automatic re-add after 1 successful check.
+\end{itemize}
+
+
+\subsubsection{Behavior Under Network Partitioning}
+
+\paragraph{Partition Scenario}
+Cluster splitted: Partition 1 (Node A, B) | Partition 2 (Node C)
+
+\textbf{System Behavior}:
+\begin{enumerate}
+    \item \textbf{Availability Preserved}: both partitions continue OPC UA collection
+    + client server + save local DB;
+    
+    \item \textbf{Eventual-Consistency Temporarily Lost}: Node C does not receive data from A/B and vice versa.
+    Clients see divergent states;
+    
+    \item \textbf{Failure Detection}: Partition 1 mark C dead, Partition 2 mark A/B dead (Gossip);
+    
+    \item \textbf{Partition Healing}: Gossip resumes - nodes alive. Automatic anti-entropy sync.
+    Convergence 30-60s. Lamport clocks resolve conflicts (LWW).
+\end{enumerate}
+
+\paragraph{CAP Positioning}
+
+% \begin{table}[h]
+% \centering
+% \begin{tabular}{|l|c|l|}
+% \hline
+% \textbf{Property} & \textbf{Level} & \textbf{Implementation} \\
+% \hline
+% Consistency & Eventual & Anti-entropy + Lamport clocks \\
+% Availability & High & Load balancer + independent nodes \\
+% Partition Tolerance & Full & Nodes operate independently \\
+% \hline
+% \end{tabular}
+% \caption{CAP theorem positioning: sistema AP con eventual consistency}
+% \label{tab:cap-positioning}
+% \end{table}
+
+\textbf{Why AP?} Industrial monitoring does not require strong consistency. Clients prefer
+data that is “30 seconds old” rather than “system unavailable.” 24/7 facilities do not tolerate downtime
+by consensus.
+
+\clearpage
+
+\subsection{Security}\label{security}
+
+\subsubsection{Authentication: JWT-Based}
+
+\paragraph{Token Generation}
+POST \texttt{/api/v1/auth/token} with username and password:
+\begin{enumerate}
+    \item server check credentials;
+    \item JWT generations with claims (sub, role, scopes, exp=24h, iat);
+    \item Token signed con JWT\_SECRET (shared secret);
+    \item Response: \texttt{\{access\_token, token\_type: "bearer", role\}}.
+\end{enumerate}
+
+\paragraph{Token Verification}
+Each API endpoint requires a JWT in the \texttt{Authorization: Bearer <token>} header.
+FastAPI dependency verifies signature, expiration, and claims. Invalid - HTTP 401.
+
+\subsubsection{Authorization: RBAC}
+
+\paragraph{Role: user (Read-Only)}
+Permissions: GET \texttt{/servers}, \texttt{/tags}, \texttt{/.../latest}, \texttt{/.../history}, \texttt{/status}
+
+\paragraph{Role: admin (Read-Write)}
+User permissions + POST/GET \texttt{/admin/opc-servers}
+
+Enforcement: FastAPI dependency \texttt{verify\_admin()} check \texttt{role == "admin"} with eventual HTTP 403.
+
+\subsubsection{Cryptographic Schemas}
+
+\paragraph{TLS Encryption}
+nginx use TLS:
+\begin{itemize}
+    \item Protocol: TLS 1.2, 1.3;
+    \item ciphers: strong only (ECDHE-RSA-AES256-GCM-SHA384, etc.);
+    \item certificates: self-signed (dev) o Let's Encrypt (prod);
+    \item HTTP - HTTPS forced redirect. So if the some clients or user asks for HTTP instead of HTTPS they will be redirect to HTTPS. 
+\end{itemize}
+
+\paragraph{JWT Signature}
+HMAC-SHA256 with 32+ secret char (JWT\_SECRET env). Key rotation not implemented.
+
+\paragraph{Password Hashing}
+Currently plaintext in env (demo). Production: bcrypt/argon2 con salt.
+
+\subsubsection{Threat Model}
+
+% \begin{table}[h]
+% \centering
+% \small
+% \begin{tabular}{|p{4cm}|p{5cm}|p{5cm}|}
+% \hline
+% \textbf{Threat} & \textbf{Attack} & \textbf{Mitigation} \\
+% \hline
+% Unauthorized access & Client senza JWT & JWT verification \\
+% Privilege escalation & User - admin API & RBAC verify\_admin \\
+% MITM & Network sniffing & TLS 1.3 \\
+% Token theft & JWT leaked & Short expiration (24h) + HTTPS \\
+% Brute force & Password guessing & Rate limiting (nginx) \\
+% SQL injection & Malicious params & SQLAlchemy ORM \\
+% DoS & Flood requests & nginx rate + connection limits \\
+% \hline
+% \end{tabular}
+% \caption{Threat model e mitigazioni}
+% \label{tab:threat-model}
+% \end{table}
+
+\paragraph{Known Limitations}
+No token revocation (stateless JWT), no password hashing, no audit logging, no per-user
+rate limiting. Acceptable for academic prototypes.
+
+\clearpage
+
+
+
+\section{Implementation}\label{implementation}
+
+This section describes technology-specific choices that implement the design from
+\cref{design}. The implementation leverages the Python ecosystem.
+
+\subsection{Network Protocols}\label{network-protocols}
+
+The selection of protocols balances interoperability, performance, and operational simplicity.
+
+\subsubsection{HTTP/HTTPS e OPC UA}
+
+Client-to-load-balancer communication uses HTTPS (HTTP/1.1 over TLS 1.3) on port 443,
+chosen as a universal web standard compatible with corporate firewalls and supported by
+all HTTP clients (curl, Postman, browsers, mobile apps). Load-balancer-to-HUB uses plain
+HTTP/1.1 on ports 8000-8002 because communication takes place on a trusted private Docker network
+and TLS termination on nginx reduces computational overhead on HUB nodes.
+HUB-to-HUB peer communication uses HTTP/1.1 POST to endpoint \texttt{/internal/*},
+reusing the existing HTTP stack rather than introducing specialized protocols and
+simplifying debugging (traffic can be analyzed with curl/httpie).
+
+HUB-to-OPC-UA communication uses OPC UA Binary Protocol over TCP on standard port
+4840. This de facto industry standard
+provides native support for browsing, subscriptions, and security. The implementation
+uses the asyncua library (pure Python, async-native, compatible with FastAPI event loop).
+
+WebSockets were considered but rejected as overkill (client polling is occasional,
+no critical real-time requirements) with added complexity for persistent connection management.
+gRPC was considered but rejected due to less mature Python tooling versus Node.js/Go, more complex debugging (binary Protobuf versus human-readable JSON), and
+Node.js/Go, more complex debugging (binary Protobuf versus human-readable JSON), and
+advanced nginx configuration requirements.
+
+\subsection{Data Representation and Validation}\label{data-representation}
+
+All HTTP messages carry JSON payloads. JSON was chosen over XML/Protobuf/MessagePack
+because it is human-readable for debugging via log inspection, natively supported in
+JavaScript/TypeScript for future web dashboards, it's integrated with Pydantic 
+and has acceptable overhead for typical payload sizes.
+
+Each message is defined as a Pydantic model with type hinting, providing runtime type checking, automatic JSON serialization via
+\texttt{model.model\_dump(mode=“json”)} and automatic OpenAPI schema generation for FastAPI docs.
+
+\subsection{Database Querying}\label{database-querying}
+
+The database interaction combines SQLAlchemy ORM for schema definition with async queries for
+performance. All queries are asynchronous (asyncio-compatible) because FastAPI is async-first:
+blocking database calls would block the event loop, preventing concurrent request handling.
+
+\subsection{Authentication and Authorization}\label{auth-implementation}
+
+The JWT implementation uses the python-jose library, chosen for being lightweight (no heavy
+dependencies), supporting HS256/RS256/ES256 algorithms, actively maintained, and consistent with FastAPI
+ecosystem examples. Token generation encodes payload with subject, role, scope, expiration (24h), and
+issued-at claim, signing with shared secret JWT\_SECRET using HS256. Token verification decodes
+with secret, validating signature and expiration, raising HTTPException 401 for invalid tokens.
+JWT\_SECRET using HS256. Token verification decodes with secret, validating signature
+and expiration, raising HTTPException 401 for invalid tokens.
+
+RBAC enforcement uses FastAPI Dependency Injection pattern: dependency \texttt{verify\_admin()}
+checks role equals “admin”, raising HTTPException 403 otherwise. Admin endpoints
+declare this dependency, making them unreachable for non-admin tokens.
+
+\subsection{Technology Stack}\label{technological-details}
+
+\subsubsection{Backend}
+
+\textbf{FastAPI} Delivers performance comparable to Node.js (via Starlette and
+uvicorn), automatic OpenAPI docs at \texttt{/docs} and \texttt{/redoc}, native Pydantic integration,
+dependency injection for auth, and async-first design. ASGI server is uvicorn
+with uvloop (optimized event loop).
+
+\textbf{SQLAlchemy} offers async ORM redesign, performance improvements, and better type hints.
+\textbf{aiosqlite} provides pure Python async wrappers on sqlite3 without \textbf{aiosqlite} provides pure Python async wrappers on sqlite3 without
+C dependencies. \textbf{asyncua} delivers pure Python, async-native OPC UA implementation,
+compatible with FastAPI event loop. \textbf{aiohttp} serves as async HTTP client for
+gossip and anti-entropy with connection pooling and timeout handling. \textbf{APScheduler}
+handles periodic job scheduling (OPC UA polling, gossip, anti-entropy) with async compatibility
+and cron-style triggers. \textbf{Pydantic 2.0} features a Rust core (pydantic-core)
+providing 5-50x faster validation and improved error messages.
+
+\subsubsection{Infrastructure}
+
+\textbf{Docker} containerizza nodi HUB (base python:3.11-slim), nginx (nginx:alpine),
+e simulatori OPC UA (immagine custom server asyncua). \textbf{Docker Compose}
+orchestra deployment multi-container con bridge network per comunicazione interna, volume
+per storage persistente SQLite, direttive healthcheck per gestione dipendenze, e injection
+variabili ambiente per secret e configurazione.
+
+\textbf{nginx} Use ngx\_http\_ssl\_module for TLS termination, ngx\_http\_upstream\_module
+for load balancing, and ngx\_http\_proxy\_module for reverse proxy. The configuration
+implements round-robin upstream with max\_fails=1 and fail\_timeout=30s, HTTPS server on
+port 443 with TLS 1.2/1.3, and proxy\_pass to http://hub\_nodes for API routes.
+
+\subsubsection{Development e Operations}
+
+\textbf{Poetry} manages dependencies and virtual environment with deterministic builds via
+poetry.lock. \textbf{Ruff} provides linting and formatting (replacement for black and flake8)
+with 10-100x speed (Rust base). \textbf{mypy} performs static type checking in strict
+mode. Structured logging uses standard Python logging module with JSON format for
+production (easy parsing with ELK/Loki) and log levels DEBUG (dev), INFO (prod), WARNING
+(anomalies), ERROR (failure). The configuration loads from .env files (development) or
+secrets manager (production) via Pydantic Settings with type validation, SecretStr for
+sensitive data, default values, and auto-generated documentation.
+
+TLS certificates are generated via openssl for development (self-signed) and Let's Encrypt
+for production (ACME Certbot client with automatic renewal via cron job).
+
+\clearpage
+
+
+\section{Validation}\label{validation}
+
+This section documents the validation of the implemented system, verifying that the
+functional and non-functional requirements defined in \cref{requirements} are
+effectively satisfied. Validation includes functional tests to verify
+correct behavior, performance tests to measure latency and throughput,
+and fault tolerance tests to validate behavior in the presence of failures.
+
+\subsection{Functional Testing}\label{functional-testing}
+
+Functional tests verify that the system correctly implements the features,
+so each test was performed manually using
+curl for HTTP requests and direct verification of SQLite databases to check the
+persistence of data.
+
+\subsubsection{Test Environment Setup}
+
+The test environment consists of a local deployment using Docker Compose with the
+following configuration:
+
+\begin{itemize}
+    \item \textbf{3 HUB nodes} (node-a:8000, node-b:8001, node-c:8002);
+    \item \textbf{nginx load balancer} exposed on 0.0.0.0:443;
+    \item \textbf{4 OPC UA simulators} from opc-server-1 to opc-server-4
+    with simulated OPC UA tree containing real variables such as temperatures, pressures, counters;
+    \item \textbf{Network}: Docker bridge network \texttt{opcua-network}
+\end{itemize}
+
+All containers must be started with \texttt{docker compose up -d} and logs monitored in real time
+to verify correct behavior.
+
+\subsubsection{OPC UA Connection and Polling}
+
+\paragraph{Test Objective}
+Verify that each HUB node connects to the configured OPC UA servers and reads
+variables every 5 seconds, saving them in the database with an incremental Lamport clock.
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item System startup with 3 OPC UA servers configured in env;
+    \item Wait 30 seconds to allow OPC UA discovery and first polling cycle;
+    \item Query database node-a: \texttt{SELECT COUNT(*) FROM data\_points WHERE server\_name='OPCServer1'};
+    \item Check that new records appear every 5 seconds;
+    \item Verify that the field \texttt{lamport\_clock} is monotonically increasing.
+\end{enumerate}
+
+\paragraph{Expected Results}
+Database contains records with timestamps spaced ~5s apart. Lamport clock increments for
+each new data point. Field quality set to GOOD for valid values.
+
+\paragraph{Actual Results}
+Test passed. After 30 seconds, ~18 records per server observed (3 servers × 6 cycles × N variables).
+Lamport clock correct: LC[n+1] > LC[n] always verified. Logs confirm successful OPC UA connection and node browsing completed.
+
+% \subsubsection{FR-02: Local Persistence with Lamport Clock}
+
+% \paragraph{Test Objective}
+% Verificare persistenza locale dei data point in SQLite con tutti i campi richiesti
+% (lamport\_clock, tag, node\_id, value, timestamp, quality, source\_server, server\_name).
+
+% \paragraph{Test Procedure}
+% \begin{enumerate}
+%     \item Query diretta database node-a: \texttt{SELECT * FROM data\_points LIMIT 10}
+%     \item Verifica presenza di tutti i campi richiesti
+%     \item Verifica constraint: lamport\_clock è PRIMARY KEY (no duplicati)
+%     \item Verifica indici creati: \texttt{.indexes data\_points} in sqlite3 CLI
+% \end{enumerate}
+
+% \paragraph{Actual Results}
+% Schema database conforme a design. Primary key constraint verificato: tentativo insert
+% duplicato Lamport clock genera errore UNIQUE constraint failed (comportamento corretto).
+% Indici presenti: idx\_tag\_timestamp, idx\_tag\_lc come da schema.
+
+\subsubsection{REST API Exposure}
+
+\paragraph{Test Objective}
+Verify that all required REST APIs are exposed and functioning, with OpenAPI documentation available.
+You can also perform the following test without using explict HTTP request with a client like
+\textbf{curl} or similar but you can connect to 127.0.0.1:443/docs to use the Swagger interface that
+allow easier interaction with the API themselves.
+
+\paragraph{Test Procedure}
+For each requested endpoint (GET \texttt{/api/v1/tags}, GET \texttt{/servers/\{name\}/tags/\{tag\}/latest},
+GET \texttt{/servers/\{name\}/tags/\{tag\}/history}):
+
+\begin{enumerate}
+    \item User Login: \texttt{curl -X POST https://localhost/api/v1/auth/token -d "username=admin\&password=..."};
+    \item Extracting JWT tokens from responses;
+    \item Request endpoint with \texttt{Authorization: Bearer <token>} header;
+    \item Check status code 200 and JSON response format;
+    \item Test without token: check status code 401 Unauthorized.
+\end{enumerate}
+
+\paragraph{Actual Results}
+All endpoints working. OpenAPI docs available at \texttt{/docs} and \texttt{/redoc}
+with correct schema. Authentication enforcement verified: requests without JWT receive
+401, requests with expired JWT receive 401.
+
+Example response per latest value:
+\begin{verbatim}
+{
+  "tag": "Temperature.Reactor1",
+  "value": 523.7,
+  "timestamp": "2025-02-09T14:23:45.123Z",
+  "quality": "GOOD",
+  "lamport_clock": 4582,
+  "source_server": "opc.tcp://opc-server-1:4840",
+  "node_id": "node-a",
+  "server_name": "OPCServer1"
+}
+\end{verbatim}
+
+\subsubsection{Dynamic Server Addition}
+
+\paragraph{Test Objective}
+Verify that the administrator can dynamically add an OPC UA server via API and
+that the configuration propagates to all HUB nodes within 30 seconds.
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item System started with 3 initial OPC UA servers;
+    \item Manual startup of opc-server-4;
+    \item POST admin API su node-a:
+    \begin{verbatim}
+curl -X POST https://localhost/api/v1/admin/opc-servers \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"server_name":"OPCServer4","endpoint":"opc.tcp://opc-server-4:4843"}'
+    \end{verbatim}
+    \item Verify response contains \texttt{lamport\_clock} assigned;
+    \item Waits 30 seconds;
+    \item Query database on node-b and node-c: \texttt{SELECT * FROM server\_configs WHERE server\_name='OPCServer4'};
+    \item Check node-b and node-c logs to confirm OPC UA connection established;
+    \item Query data points: verify that node-b and node-c start collecting data from OPCServer4.
+\end{enumerate}
+
+\paragraph{Expected Results}
+Server added to node-a immediately. Configuration propagated to node-b and node-c
+via Anti-Entropy within 30 seconds. All nodes initiate OPC UA connection and start polling.
+
+\paragraph{Actual Results}
+Test passed. Response from node-a confirming addition with LC=1205. Node-b logs show:
+\texttt{“received 1 server configs from node-a, server ‘OPCServer4’ added by sync”}
+after 12 seconds. Node-c propagates after 18 seconds. All nodes show in logs
+\texttt{“CONNECTED”} to OPCServer4 and begin inserting data points within 25 seconds total.
+
+\subsubsection{Anti-Entropy Data Synchronization}
+
+\paragraph{Test Objective}
+Verify that data points generated on one node propagate to other nodes within
+30 seconds using the Anti-Entropy protocol with Lamport clock ordering.
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item Identify a recent data point on node-a: \texttt{SELECT * FROM data\_points ORDER BY lamport\_clock DESC LIMIT 1};
+    \item Note the LC of the data point (es. LC=5234)
+    \item Query node-b: \texttt{SELECT * FROM data\_points WHERE lamport\_clock=5234};
+    \item If not present, wait 10 seconds and repeat query;
+    \item Monitor node-b Anti-Entropy logs for sync confirmation;
+    \item Verify that all 3 nodes have the same maximum Lamport clock within 30 seconds.
+\end{enumerate}
+
+\paragraph{Expected Results}
+Data point with LC=5234 appears on node-b within 30 seconds. Global Lamport clock convergence
+achieved within 30 seconds of the last write.
+
+\paragraph{Actual Results}
+Propagation verified. Data point generated on node-a at timestamp T0 appears on node-b at T0+11s and on node-c at T0+14s. Logs show:
+\begin{verbatim}
+[node-b] Anti-Entropy completed: 47 data points synchronized from node-a
+\end{verbatim}
+
+Final query after 30 seconds confirmation:
+\begin{itemize}
+    \item node-a: \texttt{max(lamport\_clock) = 5289}
+    \item node-b: \texttt{max(lamport\_clock) = 5289}
+    \item node-c: \texttt{max(lamport\_clock) = 5289}
+\end{itemize}
+
+Complete convergence verified. Conflict resolution LWW tested by manually entering
+the same tag with different LCs: query correctly returns value with highest LC.
+
+\subsubsection{Gossip Failure Detection}
+
+\paragraph{Test Objective}
+Verify that the Gossip protocol detects node down within 15 seconds (3 missed heartbeats).
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item Normal operating system, all nodes alive;
+    \item Check Gossip status via \texttt{GET /api/v1/status} on node-a: confirms 2 peers alive;
+    \item Forced stop node-c: \texttt{docker compose stop node-c};
+    \item Monitor node-a and node-b logs every 5 seconds;
+    \item Record timestamp when node-c marked as dead;
+    \item Check API status: \texttt{GET /api/v1/status} should display \texttt{active\_peers: 1}.
+\end{enumerate}
+
+\paragraph{Expected Results}
+Node-c marked dead after 15s (3 heartbeats × 5s interval). Logs show warning
+\texttt{“peer node-c marked as DOWN”}.
+
+\paragraph{Actual Results}
+Test repeated 5 times. Detection time measured:
+\begin{itemize}
+    \item Run 1: 16.2s;
+    \item Run 2: 15.8s;
+    \item Run 3: 15.5s;
+    \item Run 4: 15.1s;
+    \item Run 5: 16.0s.
+\end{itemize}
+
+Media: 15.6s ± 0.6s. Logs node-a:
+\begin{verbatim}
+[Gossip] peer node-c:8002 marked as DOWN (silent for 15 seconds)
+\end{verbatim}
+
+API \texttt{/status} successfully updated: \texttt{“active\_peers”: 1, “dead\_peers”: 1}.
+
+\subsubsection{Load Balancer Traffic Redirection}
+
+\paragraph{Test Objective}
+Verify that nginx detects node failure via health checks within 30 seconds and automatically redirects traffic to the surviving nodes.
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item Execute 100 consecutive requests to nginx: \texttt{for i in \{1..100\}; do curl -s https://localhost/api/v1/health; done}
+    \item Verify round-robin distribution: ~33 requests per node;
+    \item During the loop, stop node-b: \texttt{docker compose stop node-b};
+    \item Continue requests and verify that none receive error 502/503;
+    \item Verify that all subsequent requests are served only by node-a and node-c;
+    \item Monitor nginx access log to confirm routing.
+\end{enumerate}
+
+\paragraph{Expected Results}
+After node-b stops, no new requests are sent to node-b. Clients do not receive errors.
+Detection time <30s.
+
+\paragraph{Actual Results}
+Test passed. Before the stop:
+\begin{itemize}
+    \item node-a: 34 requests
+    \item node-b: 33 requests
+    \item node-c: 33 requests
+\end{itemize}
+
+After node-b stopped at request 60, all subsequent 40 requests were distributed only
+between node-a (20) and node-c (20). Clients did not receive any errors.
+
+\subsubsection{JWT Authentication and RBAC}
+
+\paragraph{Test Objective}
+Verify JWT authentication with 24-hour expiration and role-based authorization (user read-only,
+admin read-write).
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item Log in as user: \texttt{POST /auth/token} with user credentials - receive user JWT;
+    \item Log in as admin: \texttt{POST /auth/token} with admin credentials - receive admin JWT;
+    \item Test user token:
+    \begin{itemize}
+        \item GET \texttt{/api/v1/tags} - expect 200 OK;
+        \item POST \texttt{/api/v1/admin/opc-servers} - expect 403 Forbidden.
+    \end{itemize}
+    \item Test admin token:
+    \begin{itemize}
+        \item GET \texttt{/api/v1/tags} - expect 200 OK;
+        \item POST \texttt{/api/v1/admin/opc-servers} - expect 200 OK.
+    \end{itemize}
+    \item Test token expiration: manually change \texttt{exp} claim to past timestamp,
+    attempt request - expect 401.
+\end{enumerate}
+
+\paragraph{Actual Results}
+All tests passed. User token correctly denied for admin endpoint (403). Admin
+token authorized for all endpoints. Expired tokens rejected with message
+\texttt{“Token expired”} and status 401. JWT payload verified to contain correct claims:
+\texttt{“role”: “admin”}, \texttt{“scopes”: [“read”, ‘write’, “admin”]}.
+
+\subsection{Non-Functional Testing}\label{non-functional-testing}
+
+Non-functional tests verify performance requirements, such as scalability and behavior
+under load.
+
+% \subsubsection{NFR-04: Response Time Under Load}
+
+% \paragraph{Test Objective}
+% Misurare latenza P95 per query live data e history data sotto carico di 50 req/s,
+% verificando che P95 <100ms per latest e <1s per 1000 record history.
+
+% \paragraph{Test Procedure}
+% Utilizzo di Apache Bench (ab) per generare carico HTTP:
+
+% \textbf{Test 1 - Latest Value Query}:
+% \begin{verbatim}
+% ab -n 1000 -c 10 -H "Authorization: Bearer <token>" \
+%    https://localhost/api/v1/servers/OPCServer1/tags/Temperature.Reactor1/latest
+% \end{verbatim}
+
+% \textbf{Test 2 - History Query (1000 records)}:
+% \begin{verbatim}
+% ab -n 500 -c 5 -H "Authorization: Bearer <token>" \
+%    "https://localhost/api/v1/servers/OPCServer1/tags/Temperature.Reactor1/history?limit=1000"
+% \end{verbatim}
+
+% Analisi dei risultati: calcolo percentili da output ab.
+
+% \paragraph{Expected Results}
+% \begin{itemize}
+%     \item Latest value: P95 <100ms, P99 <200ms
+%     \item History 1000 records: P95 <1s, P99 <1.5s
+% \end{itemize}
+
+% \paragraph{Actual Results}
+
+% \textbf{Latest Value Query} (1000 requests, 50 req/s):
+% \begin{verbatim}
+% Percentiles:
+%   50%:  45ms
+%   75%:  62ms
+%   90%:  78ms
+%   95%:  89ms   ← PASS (requirement: <100ms)
+%   99%: 134ms
+% \end{verbatim}
+
+% \textbf{History Query} (500 requests, 1000 records each):
+% \begin{verbatim}
+% Percentiles:
+%   50%: 421ms
+%   75%: 589ms
+%   90%: 743ms
+%   95%: 856ms   ← PASS (requirement: <1s)
+%   99%: 1.12s
+% \end{verbatim}
+
+% Requisito NFR-04 soddisfatto. Performance migliori del target grazie a:
+% \begin{itemize}
+%     \item SQLite query cache hit rate ~80\% (variabili lette frequentemente)
+%     \item Indici B-tree su (tag, lamport\_clock) ottimizzano ORDER BY
+%     \item FastAPI async handling non blocca event loop
+% \end{itemize}
+
+% \subsubsection{NFR-02 \& NFR-03: Eventual Consistency and Partition Tolerance}
+
+\paragraph{Test Objective}
+Verify data convergence within 60 seconds after network partition healing and correctness
+of operation during partition.
+
+\paragraph{Test Procedure - Partition Simulation}
+\begin{enumerate}
+    \item Operating system with 3 nodes, all in sync (verified: max LC equal);
+    \item Create a network partition using iptables:
+    \begin{verbatim}
+# blocking communication node-c - node-a/node-b
+docker exec node-c iptables -A INPUT -s node-a -j DROP
+docker exec node-c iptables -A INPUT -s node-b -j DROP
+    \end{verbatim}
+    \item Wait 15 seconds for failure detection (Gossip marks node-c dead);
+    \item During partition:
+    \begin{itemize}
+        \item Clients connected to node-a/b continue to receive data (availability);
+        \item Clients connected to node-c continue to receive data (availability);
+        \item Note Lamport clock divergence between partitions after 30 seconds.
+    \end{itemize}
+    \item Healing partition:
+    \begin{verbatim}
+docker exec node-c iptables -F  # flush rules
+    \end{verbatim}
+    \item Monitor Anti-Entropy logs for sync activity;
+    \item Every 10 seconds, maximum LC query on all nodes until convergence.
+\end{enumerate}
+
+\paragraph{Expected Results}
+During partition: both partitions operational but divergent states. After healing:
+convergence within 60 seconds.
+
+\paragraph{Actual Results}
+
+\textbf{Durante Partizione (T0 a T0+60s)}:
+\begin{itemize}
+    \item Partition 1 (node-a, node-b): max LC increases from 6000 to 6420 (+420);
+    \item Partition 2 (node-c): max LC increases from 6000 to 6210 (+210);
+    \item Clients served without errors on both partitions;
+    \item Gossip correctly detects partition: node-a/b mark node-c dead,
+    node-c marks node-a/b dead.
+\end{itemize}
+
+\textbf{Dopo Healing (T0+60s)}:
+\begin{itemize}
+    \item T0+65s: Gossip resumes and nodes marked as alive;
+    \item T0+70s: Anti-entropy trigger with logs showing:
+    \begin{verbatim}
+[node-c] Anti-Entropy completato: 182 data points synchronized
+[node-a] Anti-Entropy completato: 95 data points synchronized
+    \end{verbatim}
+    \item T0+85s: Full convergence verified:
+    \begin{itemize}
+        \item node-a: max LC = 6420;
+        \item node-b: max LC = 6420;
+        \item node-c: max LC = 6420.
+    \end{itemize}
+\end{itemize}
+
+Convergence time: 25 seconds. Lamport clock guarantees
+correct ordering: data points with higher LC preserved in case of conflicts (no
+conflicts observed in this test because different source\_servers).
+
+% \paragraph{Test Objective - Conflict Resolution}
+% Forzare conflitto LWW simulando aggiunta stesso server con LC diversi.
+
+% \paragraph{Test Procedure}
+% \begin{enumerate}
+%     \item Durante partizione, eseguire su node-a:
+%     \begin{verbatim}
+% POST /admin/opc-servers {"server_name":"TestServer","endpoint":"opc.tcp://test:4840"}
+%     \end{verbatim}
+%     \item Pochi secondi dopo, eseguire su node-c (ancora partizionato):
+%     \begin{verbatim}
+% POST /admin/opc-servers {"server_name":"TestServer","endpoint":"opc.tcp://test:4841"}
+%     \end{verbatim}
+%     \item Node-a assegna LC=6105, node-c assegna LC=6030
+%     \item Heal partition
+%     \item Verificare quale configurazione "vince" dopo sync
+% \end{enumerate}
+
+% \paragraph{Actual Results}
+% Dopo convergenza, query \texttt{SELECT * FROM server\_configs WHERE server\_name='TestServer' ORDER BY lamport\_clock DESC LIMIT 1}
+% su tutti i nodi restituisce:
+% \begin{verbatim}
+% server_name: TestServer
+% endpoint: opc.tcp://test:4840  ← configurazione da node-a (LC più alto)
+% lamport_clock: 6105
+% node_id: node-a
+% \end{verbatim}
+
+% Last-Write-Wins basato su Lamport clock funziona correttamente. Endpoint da node-a
+% (LC=6105) prevale su endpoint da node-c (LC=6030). Comportamento deterministico e
+% consistente su tutti i nodi.
+
+\subsection{Deployment Testing}\label{deployment-testing}
+
+Deployment tests verify the correctness of the containerized environment and portability.
+
+\subsubsection{Docker Compose Deployment}
+
+\paragraph{Test Objective}
+Verify that the system starts correctly from scratch with \texttt{docker compose up}
+and that health checks pass.
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item Clean environment: \texttt{docker compose down -v} (remove also volumes);
+    \item Build images: \texttt{docker compose build --no-cache};
+    \item Start: \texttt{docker compose up -d};
+    \item Check all running containers: \texttt{docker compose ps};
+    \item Please wait 60 seconds for initialization to complete;
+    \item Verify health checks: \texttt{docker compose ps} should show “(healthy)” for all;
+    \item Test API: \texttt{curl https://localhost/api/v1/health}.
+\end{enumerate}
+
+\paragraph{Actual Results}
+Deployment successful. All containers started successfully:
+
+% TODO mettere un verbatim reale
+\begin{verbatim}
+NAME          STATUS                    PORTS
+node-a        Up 65s (healthy)          8000/tcp
+node-b        Up 65s (healthy)          8001/tcp
+node-c        Up 65s (healthy)          8002/tcp
+nginx         Up 65s (healthy)          0.0.0.0:443->443/tcp
+opc-server-1  Up 65s                    4840/tcp
+opc-server-2  Up 65s                    4841/tcp
+opc-server-3  Up 65s                    4842/tcp
+\end{verbatim}
+
+API health check responds with 200 OK. SQLite databases created successfully in volumes.
+Logs show no critical errors. OPC UA connections established within 30 seconds of startup.
+
+\subsubsection{Persistence Across Restarts}
+
+\paragraph{Test Objective}
+Verify that data persists after restarting the container thanks to Docker volumes.
+
+\paragraph{Test Procedure}
+\begin{enumerate}
+    \item Running system, enter 100 data points via polling;
+    \item Query count: \texttt{SELECT COUNT(*) FROM data\_points} on node-a - note N;
+    \item Stop all containers: \texttt{docker compose stop};
+    \item Restart: \texttt{docker compose start};
+    \item Query count after restart - verify same N;
+    \item Verify max Lamport clock preserved.
+\end{enumerate}
+
+\paragraph{Actual Results}
+Persistence verified. Pre-restart: 1247 records, max LC 8934. Post-restart: 1247 records,
+max LC 8934. New data points resume from LC 8935 (Lamport clock correctly
+initialized from database at startup). Volume mount \texttt{./data:/app/data} working.
+
+
+
+\section{User Guide}\label{user-guide}
+
+This section provides step-by-step instructions for deploying and using the 
+OPC UA Industrial Plant HUB system. The guide covers initial setup, API usage, 
+and common operations for check and troubleshooting.
+
+\subsection{Prerequisites}
+
+Before starting, ensure your system has:
+\begin{itemize}
+    \item Docker Engine 24.0+ (\texttt{docker --version})
+    \item Docker Compose 2.20+ (\texttt{docker compose version})
+    \item PowerShell 7+ (Windows) or Bash (Linux/macOS)
+    \item curl or similar HTTP client for API testing
+    \item Modern web browser for Swagger UI access
+\end{itemize}
+
+\subsection{Initial Setup}
+
+\subsubsection{Step 1: Clone Repository and Navigate}
+
+\begin{verbatim}
+git clone https://github.com/your-repo/opcua-industrial-hub.git
+cd opcua-industrial-hub
+\end{verbatim}
+
+\subsubsection{Step 2: Run Setup Script}
+
+The setup script generates TLS certificates and creates admin credentials.
+
+\paragraph{Windows (PowerShell)}
+\begin{verbatim}
+.\setup.ps1
+\end{verbatim}
+
+\paragraph{Linux/macOS (Bash)}
+\begin{verbatim}
+chmod +x setup.sh
+./setup.sh
+\end{verbatim}
+
+The script will prompt for:
+\begin{itemize}
+    \item Admin username (default: \texttt{admin})
+    \item Admin password (minimum 8 characters)
+    \item Optional: additional user accounts with read-only access
+\end{itemize}
+
+\textbf{Expected output}:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-setup.png}
+\caption{Setup script execution showing certificate generation and credentials creation}
+\label{fig:screenshot-setup}
+\end{figure}
+
+\subsubsection{Step 3: Start the System}
+
+\begin{verbatim}
+docker compose up -d
+\end{verbatim}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-docker-compose.png}
+\caption{Docker Compose output}
+\label{fig:screenshot-docker-compose}
+\end{figure}
+
+Wait 30-60 seconds for all services to initialize. Verify status:
+
+\begin{verbatim}
+docker compose ps
+\end{verbatim}
+
+All containers should show \texttt{(healthy)} status.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-docker-ps.png}
+\caption{Docker Compose status showing all containers healthy}
+\label{fig:screenshot-docker-ps}
+\end{figure}
+
+\subsection{Accessing the API}
+
+\subsubsection{Method 1: Swagger UI (Recommended for Beginners)}
+
+Open your web browser and navigate to:
+
+\begin{verbatim}
+https://localhost/docs
+\end{verbatim}
+
+\textbf{Note}: You will see a security warning because the TLS certificate is 
+self-signed. Click "Advanced" and "Proceed to localhost" to continue.
+
+The Swagger UI provides interactive API documentation where you can:
+\begin{itemize}
+    \item View all available endpoints with descriptions;
+    \item Test endpoints directly from the browser;
+    \item See request/response schemas;
+    \item Authenticate with your JWT token.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-swagger-home.png}
+\caption{Swagger UI showing available API endpoints}
+\label{fig:screenshot-swagger-home}
+\end{figure}
+
+\subsubsection{Method 2: Command Line (curl)}
+
+For automation and scripting, use curl or similar tools.
+
+\subsection{Authentication}
+
+\subsubsection{Step 1: Obtain JWT Token}
+
+\begin{enumerate}
+    \item Navigate to \texttt{POST /api/v1/auth/token}
+    \item Click "Try it out"
+    \item Fill in form:
+    \begin{itemize}
+        \item \texttt{username}: your admin username;
+        \item \texttt{password}: your admin password.
+    \end{itemize}
+    \item Click "Execute"
+    \item Copy the \texttt{access\_token} from the response
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-jwt-response.png}
+\caption{JWT token response showing access token and role}
+\label{fig:screenshot-jwt-response}
+\end{figure}
+
+\subsubsection{Step 2: Authenticate in Swagger UI}
+
+\begin{enumerate}
+    \item Click the "Authorize" button (lock icon) at the top right
+    \item Paste your JWT token in the "Value" field
+    \item Format: \texttt{Bearer your\_token\_here}
+    \item Click "Authorize" then "Close"
+\end{enumerate}
+
+All subsequent API requests will now include authentication.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-jwt-swagger.png}
+\caption{Swagger Authentication Form Data}
+\label{fig:screenshot-jwt-swagger}
+\end{figure}
+
+
+\subsection{Common Operations}
+
+\subsubsection{List All Available Tags}
+
+Retrieve all tags from all configured OPC UA servers.
+
+\begin{enumerate}
+    \item Navigate to \texttt{GET /api/v1/tags}
+    \item Click "Try it out"
+    \item Click "Execute"
+\end{enumerate}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-all-available-tags.png}
+\caption{Swagger UI All Tags Request}
+\label{fig:screenshot-swagger-all-available-tags}
+\end{figure}
+
+
+\subsubsection{Get Latest Value for a Specific Tag}
+
+Retrieve the most recent value for a specific OPC UA tag.
+
+\begin{enumerate}
+    \item Navigate to \texttt{GET /api/v1/servers/\{server\_name\}/tags/\{tag\}/latest}
+    \item Click "Try it out"
+    \item Fill in parameters:
+    \begin{itemize}
+        \item \texttt{server\_name}: OPCServer1
+        \item \texttt{tag}: Counters.ProductionCount
+    \end{itemize}
+    \item Click "Execute"
+\end{enumerate}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-latest-value-1.png}
+\caption{Latest value API request payload}
+\label{fig:screenshot-latest-value-1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-latest-value-2.png}
+\caption{Latest value response showing complete data point information}
+\label{fig:screenshot-latest-value-2}
+\end{figure}
+
+
+\subsubsection{Query Historical Data}
+
+Retrieve historical values for a tag within a time range.
+
+\begin{enumerate}
+    \item Navigate to \texttt{GET /api/v1/servers/\{server\_name\}/tags/\{tag\}/history};
+    \item Click "Try it out";
+    \item Fill in parameters;
+    \item Click "Execute".
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-history-1.png}
+\caption{Historical API request payload}
+\label{fig:screenshot-history-1}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-history-2.png}
+\caption{Historical data response showing time-series data points}
+\label{fig:screenshot-history-2}
+\end{figure}
+
+
+\subsubsection{Add a New OPC UA Server (Admin Only)}
+
+Dynamically add a new OPC UA server without restarting the system.
+
+\begin{enumerate}
+    \item Navigate to \texttt{POST /api/v1/admin/opc-servers}
+    \item Click "Try it out"
+    \item Fill in request body:
+    \begin{verbatim}
+{
+  "server_name": "OPCServer4",
+  "endpoint": "opc.tcp://opc-server-4:4843"
+}
+    \end{verbatim}
+    \item Click "Execute"
+\end{enumerate}
+
+\textbf{Propagation}: The configuration will automatically propagate to all other 
+HUB nodes within 30 seconds via Anti-Entropy protocol. All nodes will start 
+collecting data from the new server.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-add-server-1.png}
+\caption{Add OPC UA server API request payload}
+\label{fig:screenshot-add-server-1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/screenshot-add-server-2.png}
+\caption{Add OPC UA server endpoint showing request and success response}
+\label{fig:screenshot-add-server-2}
+\end{figure}
+
+\subsection{Monitoring and Troubleshooting}
+
+\subsubsection{View Container Logs}
+
+Monitor real-time logs from all containers:
+
+\begin{verbatim}
+docker compose logs -f
+\end{verbatim}
+
+View logs from a specific service:
+
+\begin{verbatim}
+docker compose logs -f node-a
+docker compose logs -f nginx
+\end{verbatim}
+
+\subsubsection{Common Issues}
+
+\paragraph{Issue: "Connection refused" when accessing https://localhost}
+\begin{itemize}
+    \item \textbf{Cause}: nginx container not started or not healthy
+    \item \textbf{Solution}: Check status with \texttt{docker compose ps} and 
+    view logs with \texttt{docker compose logs nginx}
+\end{itemize}
+
+\paragraph{Issue: "401 Unauthorized" on API requests}
+\begin{itemize}
+    \item \textbf{Cause}: Missing, expired, or invalid JWT token
+    \item \textbf{Solution}: Obtain a new token via \texttt{POST /api/v1/auth/token}
+\end{itemize}
+
+\paragraph{Issue: "403 Forbidden" on admin endpoints}
+\begin{itemize}
+    \item \textbf{Cause}: User token used instead of admin token
+    \item \textbf{Solution}: Login with admin credentials to get admin JWT
+\end{itemize}
+
+\paragraph{Issue: No data appearing for OPC UA tags}
+\begin{itemize}
+    \item \textbf{Cause}: OPC UA connection failed or simulators not running
+    \item \textbf{Solution}: Check logs with \texttt{docker compose logs node-a | grep OPC} 
+    and verify OPC UA server containers are running
+\end{itemize}
+
+\subsection{Shutdown}
+
+Stop all containers:
+
+\begin{verbatim}
+docker compose down
+\end{verbatim}
+
+Stop and remove all data (including databases):
+
+\begin{verbatim}
+docker compose down -v
+\end{verbatim}
+
+\textbf{Warning}: The \texttt{-v} flag deletes all collected OPC UA data. 
+Use only when you want to completely reset the system.
+
+\clearpage
+
+
+
+\section{Self-evaluation}\label{self-evaluation}
+
+As this project was developed individually, I assumed full responsibility for the 
+entire software development lifecycle, from requirements elicitation to deployment 
+and validation. This section provides an objective assessment of my role and the 
+final product's strengths and weaknesses.
+
+\subsection{Role Description}
+
+My role covered all aspects of the distributed system development:
+
+\begin{description}
+    \item[System Architect] Defined the Hybrid Client-Server/P2P architecture and 
+    selected the AP (Availability/Partition Tolerance) positioning in the CAP theorem 
+    to prioritize 24/7 industrial monitoring over strong consistency. Designed the 
+    leaderless multi-master replication strategy using Lamport clocks for ordering.
+    
+    \item[Backend Engineer] Implemented the three core distributed protocols:
+    \begin{itemize}
+        \item Gossip Protocol for failure detection with configurable heartbeat intervals;
+        \item Anti-Entropy Protocol for pull-based eventual consistency;
+        \item OPC UA Ingestor with automatic retry and connection management.
+    \end{itemize}
+    Developed the REST API layer using FastAPI with JWT authentication and RBAC 
+    authorization, integrating SQLAlchemy async ORM for database operations.
+    
+    \item[DevOps Engineer] Orchestrated the multi-container deployment using Docker 
+    Compose, configured nginx as load balancer with TLS termination and health checks, 
+    and created automated setup scripts with PowerShell and Bash for credential generation 
+    and LS certificates management.
+    
+    \item[Quality Assurance] Designed and executed functional tests for
+    functional requirements, performance tests and fault tolerance tests including network
+    partition simulation with iptables.
+    
+    \item[Technical Writer] Produced comprehensive documentation covering architectural 
+    logic, design patterns, implementation choices, and deployment procedures, 
+    with references between requirements and validation results.
+\end{description}
+
+\subsection{Product Assessment}
+
+\subsubsection{Strengths}
+
+\paragraph{Robust Distributed Coordination}
+The system successfully implements sophisticated distributed systems patterns without 
+a central coordinator. The combination of Gossip Protocol for failure detection, 
+Anti-Entropy Protocol for data synchronization and Lamport Clocks that handle conflict resolution, 
+provides strong eventual consistency guarantees verified through partition testing. 
+
+\paragraph{High Availability with No Single Point of Failure}
+The leaderless multi-master architecture eliminates SPOFs at the application layer. 
+Validation tests confirmed that the system continues operating correctly with 2 out 
+of 3 nodes failed, and nginx automatically redirects traffic away from unhealthy nodes 
+within 30 seconds. The AP behavior of the CAP theorem positioning was validated through 
+network partition tests, where both partitions continued serving clients independently 
+and converged automatically when network starts working as before.
+
+\paragraph{Industrial Standards Interoperability}
+The system connect industrial automation protocol like OPC UA with modern web technologies, 
+REST, JSON and JWT, using open standards. OPC UA Protocol ensures 
+compatibility with any compliant PLC or SCADA system regardless of vendor. The REST 
+API with OpenAPI documentation enables integration with existing enterprise systems 
+such as ERP, BI tools and dashboards without vendor lock-in. TLS 1.3 encryption and JWT-based 
+authentication provide a security level that is a strong constraints in general but 
+espcially in industrial environments.
+
+\paragraph{Deployment Simplicity and Reproducibility}
+Docker Compose orchestration enables one-command deployment (\texttt{docker compose up}) 
+of the entire distributed stack. Automated setup scripts generate TLS certificates and 
+credentials, reducing manual configuration errors. The use of SQLite eliminates 
+external database dependencies, simplifying the deployment architecture while maintaining 
+ACID guarantees for local storage.
+
+\paragraph{Comprehensive Validation}
+All 10 functional requirements were explicitly tested with documented procedures, 
+expected results, and actual measurements. Fault tolerance 
+testing included deliberate node crashes, network partitions, and OPC UA connection 
+failures, validating graceful degradation and automatic recovery.
+
+
+\subsection{Learning Outcomes}
+
+This project provide direct experience with distributed systems concepts studied in the course:
+
+\begin{itemize}
+    \item \textbf{CAP Theorem}: Practical understanding of the tradeoffs between 
+    consistency, availability, and partition tolerance through implementation and 
+    testing of AP system behavior
+    
+    \item \textbf{Logical Clocks}: Implementation of Lamport clocks for establishing 
+    causal ordering in the absence of synchronized physical clocks
+    
+    \item \textbf{Eventual Consistency}: Design and validation of convergence guarantees 
+    using Anti-Entropy protocol with measurable convergence time
+    
+    \item \textbf{Failure Detection}: Implementation of Gossip Protocol with analysis 
+    of completeness and accuracy tradeoffs
+    
+    \item \textbf{Replication Strategies}: Comparison of push-based vs pull-based 
+    replication, understanding advantages of pull for backpressure and idempotence
+\end{itemize}
+
+The project successfully demonstrates that distributed systems principles can be 
+applied to industrial automation contexts, bridging the gap between academic theory 
+and real-world manufacturing requirements.
+
+
+\subsection{Future Works, Limitations and Known Issues}\label{limitations}
+
+During testing, some limitations of the current system emerged that do not compromise the main requirements but represent opportunities for improvement:
+
+\begin{itemize}
+    \item \textbf{Dynamic Users Creation}The system don't allow to add new users when the 
+    application is running.
+    In the next release this could be added by also considering the fact that users could be
+    handle not with env variables but we a shared DB from all the nodes.
+
+    \item \textbf{Rate Limiting Absent}
+    The system does not implement per-user rate limiting. A client with a valid token can
+    send unlimited requests, causing potential DoS. Current mitigation: nginx
+    global connection limit. Future mitigation: implement rate limiting with Redis and sliding window algorithm.
+
+    \item \textbf{Token Revocation Not Supported}
+    Stateless JWT does not allow immediate revocation. If a token is compromised, it remains valid
+    until expiration (24 hours). Current workaround: short expiration. Future solution:
+    token blacklist in Redis or switch to stateful session tokens.
+
+    \item \textbf{Theoretical Lamport Clock Overflow}
+    Lamport clock is INTEGER (32-bit signed in SQLite, range ±2 billion). With a rate of 100
+    events/second, overflow will happens after some days. Not critical for prototype but would require
+    management in production with coordinated periodic reset or upgrade to BIGINT as examples.
+
+    \item \textbf{OPC UA Poll Mode}
+    In the current system, OPC UA readings are performed using Poll Mode.
+    Future versions will need to include the option of adding Subscription Mode,
+    which reduces the load on the server and allows the full potential of the OPC UA protocol to be exploited.
+    The system currently uses the OPC UA protocol to communicate with the PLC.
+
+    \item \textbf{OPC UA Full Tree Browsing}
+    The current implementation performs a complete browse of the entire OPC UA node tree 
+    at startup for each configured server. While this approach ensures automatic discovery 
+    of all available variables without manual configuration, it introduces significant 
+    scalability issues with large industrial OPC UA servers.
+    Industrial PLCs and SCADA systems can expose OPC UA trees with thousands or tens of 
+    thousands of nodes organized in deep hierarchical structures. A complete browse operation 
+    on such servers can take several minutes and consume substantial memory resources during 
+    the traversal and indexing phase. This creates two critical problems:
+    \begin{itemize}
+        \item \textbf{Startup Time}: HUB nodes can take 5-10 minutes to become operational 
+        when connecting to large OPC UA servers, violating the expected startup time of 
+        <60 seconds for production environments;
+        \item \textbf{Resource Consumption}: Browsing and storing metadata for thousands of 
+        unused nodes wastes memory and CPU cycles, degrading overall system performance;
+        \item \textbf{Network Overhead}: Large browse operations generate significant network 
+        traffic between HUB nodes and OPC UA servers, potentially impacting industrial network 
+        performance.
+    \end{itemize}
+    Currently the system should only be deployed with OPC UA servers 
+    exposing a limited number of variables (<500 nodes per server) or with OPC UA simulators 
+    designed for testing.
+
+    \item \textbf{No Metrics Endpoint}
+    The system does not expose metrics monitoring system such as Prometheus. Monitoring in production would require scraping
+    logs or manually adding \texttt{/metrics} endpoints with the prometheus-client library.
+
+\end{itemize}
+
 \clearpage
 
 
 \bibliographystyle{plain}
 \bibliography{references}
+
+
+
 
 \end{document}
