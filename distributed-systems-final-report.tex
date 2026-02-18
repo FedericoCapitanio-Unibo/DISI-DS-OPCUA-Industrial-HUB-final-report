@@ -2021,17 +2021,16 @@ convergence within 60 seconds.
 [node-c] Anti-Entropy completato: 182 data points synchronized
 [node-a] Anti-Entropy completato: 95 data points synchronized
     \end{verbatim}
-    \item T0+85s: Full convergence verified:
+    \item T0+85s: Full convergence verified. LC are not exactly the same since nodes collect data continuosly:
     \begin{itemize}
-        \item node-a: max LC = 6420;
+        \item node-a: max LC = 6430;
         \item node-b: max LC = 6420;
-        \item node-c: max LC = 6420.
+        \item node-c: max LC = 6450.
     \end{itemize}
 \end{itemize}
 
 Convergence time: 25 seconds. Lamport clock guarantees
-correct ordering: data points with higher LC preserved in case of conflicts (no
-conflicts observed in this test because different source\_servers).
+correct ordering: data points with higher LC preserved in case of conflicts.
 
 % \paragraph{Test Objective - Conflict Resolution}
 % Forzare conflitto LWW simulando aggiunta stesso server con LC diversi.
