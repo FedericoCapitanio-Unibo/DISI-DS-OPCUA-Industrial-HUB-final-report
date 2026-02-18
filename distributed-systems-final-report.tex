@@ -1285,8 +1285,8 @@ CREATE TABLE server_configs (
     
 \item \textbf{Read Queries}
 \begin{itemize}
-    \item Latest value: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT * WHERE tag=? AND server\_name=? ORDER BY lc DESC LIMIT 1"}
-    \item History: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT * WHERE tag=? AND timestamp BETWEEN ? AND ? ORDER BY lc ASC"}
+    \item Latest value: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT * FROM data\_points WHERE tag=? AND server\_name=? ORDER BY lc DESC LIMIT 1"}
+    \item History: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT * FROM data\_points WHERE tag=? AND timestamp BETWEEN ? AND ? ORDER BY lc ASC"}
 \end{itemize}
 
 \item \textbf{Write Queries (Serialized)}
