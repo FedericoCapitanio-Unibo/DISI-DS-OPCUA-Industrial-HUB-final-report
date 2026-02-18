@@ -1285,8 +1285,8 @@ CREATE TABLE server_configs (
     
 \item \textbf{Read Queries}
 \begin{itemize}
-    \item Latest value: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT * FROM data\_points WHERE tag=? AND server\_name=? ORDER BY lc DESC LIMIT 1"}
-    \item History: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT * FROM data\_points WHERE tag=? AND timestamp BETWEEN ? AND ? ORDER BY lc ASC"}
+    \item Latest value: \texttt{docker exec hub-node-a sqlite3 /app/data/hub\_storage.db "SELECT * FROM data\_points WHERE tag=? AND server\_name=? ORDER BY lc DESC LIMIT 1"}
+    \item History: \texttt{docker exec hub-node-a sqlite3 /app/data/hub\_storage.db "SELECT * FROM data\_points WHERE tag=? AND timestamp BETWEEN ? AND ? ORDER BY lc ASC"}
 \end{itemize}
 
 \item \textbf{Write Queries (Serialized)}
@@ -1668,7 +1668,7 @@ variables every 5 seconds, saving them in the database with an incremental Lampo
 \begin{enumerate}
     \item System startup with 3 OPC UA servers configured in env;
     \item Wait 30 seconds to allow OPC UA discovery and first polling cycle;
-    \item Query database node-a: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT COUNT(*) FROM data\_points WHERE server\_name='OPCServer1'"};
+    \item Query database node-a: \texttt{docker exec hub-node-a sqlite3 /app/data/hub\_storage.db "SELECT COUNT(*) FROM data\_points WHERE server\_name='OPCServer1'"};
     \item Check that new records appear every 5 seconds;
     \item Verify that the field \texttt{lamport\_clock} is monotonically increasing.
 \end{enumerate}
@@ -1759,7 +1759,7 @@ curl -X POST https://localhost/api/v1/admin/opc-servers \
     \end{verbatim}
     \item Verify response contains \texttt{lamport\_clock} assigned;
     \item Waits 30 seconds;
-    \item Query database on node-b and node-c: \texttt{docker exec hub-node-b sqlite3 /app/data/hub.db "SELECT * FROM server\_configs WHERE server\_name='OPCServer4'"; docker exec hub-node-c sqlite3 /app/data/hub.db "SELECT * FROM server\_configs WHERE server\_name='OPCServer4'"};
+    \item Query database on node-b and node-c: \texttt{docker exec hub-node-b sqlite3 /app/data/hub\_storage.db "SELECT * FROM server\_configs WHERE server\_name='OPCServer4'"; docker exec hub-node-c sqlite3 /app/data/hub\_storage.db "SELECT * FROM server\_configs WHERE server\_name='OPCServer4'"};
     \item Check node-b and node-c logs to confirm OPC UA connection established;
     \item Query data points: verify that node-b and node-c start collecting data from OPCServer4.
 \end{enumerate}
@@ -1782,9 +1782,9 @@ Verify that data points generated on one node propagate to other nodes within
 
 \paragraph{Test Procedure}
 \begin{enumerate}
-    \item Identify a recent data point on node-a: \texttt{docker exec hub-node-b sqlite3 /app/data/hub.db "SELECT * FROM data\_points ORDER BY lamport\_clock DESC LIMIT 1"};
+    \item Identify a recent data point on node-a: \texttt{docker exec hub-node-b sqlite3 /app/data/hub\_storage.db "SELECT * FROM data\_points ORDER BY lamport\_clock DESC LIMIT 1"};
     \item Note the LC of the data point (es. LC=5234)
-    \item Query node-b: \texttt{docker exec hub-node-b sqlite3 /app/data/hub.db "SELECT * FROM data\_points WHERE lamport\_clock=5234"};
+    \item Query node-b: \texttt{docker exec hub-node-b sqlite3 /app/data/hub\_storage.db "SELECT * FROM data\_points WHERE lamport\_clock=5234"};
     \item If not present, wait 10 seconds and repeat query;
     \item Monitor node-b Anti-Entropy logs for sync confirmation;
     \item Verify that all 3 nodes have the same maximum Lamport clock within 30 seconds.
@@ -2102,7 +2102,7 @@ Verify that data persists after restarting the container thanks to Docker volume
 \paragraph{Test Procedure}
 \begin{enumerate}
     \item Running system, enter 100 data points via polling;
-    \item Query count: \texttt{docker exec hub-node-a sqlite3 /app/data/hub.db "SELECT COUNT(*) FROM data\_points"} on node-a - note N;
+    \item Query count: \texttt{docker exec hub-node-a sqlite3 /app/data/hub\_storage.db "SELECT COUNT(*) FROM data\_points"} on node-a - note N;
     \item Stop all containers: \texttt{docker compose stop};
     \item Restart: \texttt{docker compose start};
     \item Query count after restart - verify same N;
